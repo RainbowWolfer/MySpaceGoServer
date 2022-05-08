@@ -131,6 +131,15 @@ func checkRequestMethodReturn(w http.ResponseWriter, r *http.Request, method str
 	}
 }
 
+func checkRequestMethod(r *http.Request, method string) error {
+	println(r.URL.RawPath)
+	if strings.EqualFold(r.Method, method) {
+		return nil
+	} else {
+		return errors.New("method not allowed")
+	}
+}
+
 func isEmpty(str *string) bool {
 	if str == nil {
 		return false
@@ -788,6 +797,98 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, rowsAffected)
 }
 
+func post(w http.ResponseWriter, r *http.Request) {
+	if err := checkRequestMethod(r, "post"); err == nil {
+		//post a post
+		// postPost(w, r)
+		if checkRequestMethodReturn(w, r, "post") {
+			return
+		}
+
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			httpError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		content := r.MultipartForm.Value["content"][0]
+		images := r.MultipartForm.File["post_images"]
+		println("content is : " + content)
+
+		println(images)
+		println(len(images))
+		for i, header := range images {
+			// if v.Size > MAX_UPLOAD_SIZE {
+
+			// }
+			file, err := header.Open()
+			if err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer file.Close()
+			buff := make([]byte, 512)
+			_, err = file.Read(buff)
+			if err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			filetype := http.DetectContentType(buff)
+			println("file type is: " + filetype)
+			println(filepath.Ext(header.Filename))
+			if filetype != "image/jpeg" && filetype != "image/jpg" && filetype != "image/png" {
+				httpError(w, "The provided file format is not allowed. Please upload a JPEG(JPG) or PNG image", http.StatusBadRequest)
+				continue
+			}
+			_, err = file.Seek(0, io.SeekStart)
+			if err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			f, err := os.Create(fmt.Sprintf("./uploads/posts/post_%d%s", i, filepath.Ext(header.Filename)))
+			if err != nil {
+				httpError(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			defer f.Close()
+		}
+
+		fmt.Printf("r.MultipartForm.Value: %v\n", r.MultipartForm.Value)
+		fmt.Printf("r.MultipartForm.File: %v\n", r.MultipartForm.File)
+
+	} else if err := checkRequestMethod(r, "get"); err == nil {
+		//get a post
+		getPost(w, r)
+	} else {
+		httpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func postPost(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	postBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	println(string(postBody[0:200]))
+	fmt.Printf("r.MultipartForm.Value: %v\n", r.MultipartForm.Value)
+	fmt.Printf("r.MultipartForm.Value: %v\n", r.MultipartForm.Value)
+	// content := r.MultipartForm.Value["content"]
+	// images := r.MultipartForm.Value["post_images"]
+	// println(content)
+	// println(images)
+}
+
+func getPost(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+
+}
+
 func main() {
 	mux := http.NewServeMux()
 
@@ -800,6 +901,7 @@ func main() {
 	mux.HandleFunc("/upload/avatar", postUploadAvatar)                //post
 	mux.HandleFunc("/validation/email/send", postSendValidationEmail) //post
 	mux.HandleFunc("/validation/email/validate", getValidateEmail)    //get
+	mux.HandleFunc("/post", post)                                     //post/get
 
 	if err := http.ListenAndServe(":4500", mux); err != nil {
 		log.Fatal(err)
