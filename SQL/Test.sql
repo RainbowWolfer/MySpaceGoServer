@@ -19,12 +19,16 @@ DELETE FROM email_validations
 	WHERE ev_email = 'rw@qq.com'
 
 
-insert into users (u_username,u_password,u_email) values ();
+INSERT INTO users (u_username,u_password,u_email) VALUES ();
 
-update users set u_username = 'btest' where u_id = '1' and u_username = 'forcingsmile' and u_password = '123456789:rw';
+UPDATE users SET u_username = 'btest' WHERE u_id = '1' AND u_username = 'forcingsmile' AND u_password = '123456789:rw';
 
 
-select u_id from users where u_username = 'bt2est'
+SELECT u_id FROM users WHERE u_username = 'bt2est'
 
-select ev_id from email_validations where ev_email = '%s' and ev_password = '%s'
+SELECT ev_id FROM email_validations WHERE ev_email = '%s' AND ev_password = '%s'
+
+
+
+
 

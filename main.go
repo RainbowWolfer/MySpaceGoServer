@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	_ "strconv"
 	"strings"
 	"text/template"
@@ -27,6 +28,7 @@ import (
 
 const (
 	MAX_UPLOAD_SIZE = 1024 * 1024
+	MAX_IMAGES_POST = 9
 	PORT            = 4500
 	HOST            = "http://www.cqtest.top"
 	// HOST            = "http://127.0.0.1"
@@ -204,6 +206,15 @@ func checkMissingParamters(w http.ResponseWriter, query url.Values, and bool, pa
 		}
 	}
 }
+func deleteEmpty(s []string) []string {
+	var r []string
+	for _, str := range s {
+		if str != "" {
+			r = append(r, str)
+		}
+	}
+	return r
+}
 
 func queryForRows(w http.ResponseWriter, sql string) (*sql.DB, *sql.Rows) {
 	db, err := getDatabase(w)
@@ -215,6 +226,37 @@ func queryForRows(w http.ResponseWriter, sql string) (*sql.DB, *sql.Rows) {
 		httpError(w, "Query Error with :"+sql, http.StatusInternalServerError)
 	}
 	return db, rows
+}
+
+func getImage(path string) []byte {
+	availableExts := []string{"", ".png", ".jpg", ".jpeg"}
+	var bytes []byte = nil
+	for _, ext := range availableExts {
+		p := fmt.Sprintf("%s%s", path, ext)
+		println("getting file: " + p)
+		fileBytes, err := ioutil.ReadFile(p)
+		if err != nil {
+			println("not found")
+			continue
+		}
+		println("found!")
+		bytes = fileBytes
+		break
+	}
+	return bytes
+}
+
+func getImageWithDefault(path string, defaultPath string) []byte {
+	bytes := getImage(path)
+	if bytes == nil {
+		b, err := ioutil.ReadFile(defaultPath)
+		if err != nil {
+			println("Default file not found")
+			return nil
+		}
+		bytes = b
+	}
+	return bytes
 }
 
 //Login - Get
@@ -368,6 +410,8 @@ func postUploadAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	println(buff)
+
 	filetype := http.DetectContentType(buff)
 	if filetype != "image/jpeg" && filetype != "image/jpg" && filetype != "image/png" {
 		httpError(w, "The provided file format is not allowed. Please upload a JPEG(JPG) or PNG image", http.StatusBadRequest)
@@ -453,29 +497,17 @@ func getAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := query["id"][0]
+	defaultPath := "./uploads/avatars/DefaultAvatar.png"
+	path := fmt.Sprintf("./uploads/avatars/user_%s", id)
 
-	availableExts := []string{".png", ".jpg", ".jpeg", ""}
-	var bytes []byte
-	for _, ext := range availableExts {
-		path := fmt.Sprintf("./uploads/avatars/user_%s%s", id, ext)
-		fileBytes, err := ioutil.ReadFile(path)
-		if err != nil {
-			println("Continue" + ext + "\n" + err.Error())
-			continue
-		}
-		println("break" + ext)
-		bytes = fileBytes
-		break
-	}
+	bytes := getImageWithDefault(path, defaultPath)
 	if bytes == nil {
-		fileBytes, err := ioutil.ReadFile("./uploads/avatars/DefaultAvatar.png")
-		if err != nil {
-			httpError(w, "Default File Not Found", http.StatusInternalServerError)
-			return
-		}
-		bytes = fileBytes
+		httpError(w, "File not found", http.StatusBadRequest)
+		return
 	}
 
+	println(bytes)
+	println(bytes == nil)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(bytes)
@@ -810,16 +842,89 @@ func post(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		println(r.MultipartForm.File)
+		println(r.MultipartForm.Value)
+
 		content := r.MultipartForm.Value["content"][0]
+		publisherID := r.MultipartForm.Value["publisher_id"][0]
+		postVisibility := r.MultipartForm.Value["post_visibility"][0]
+		replyVisibility := r.MultipartForm.Value["reply_visibility"][0]
+		tags := strings.Split(r.MultipartForm.Value["tags"][0], "&#10;")
 		images := r.MultipartForm.File["post_images"]
 		println("content is : " + content)
+		println(publisherID)
+		println(postVisibility)
+		println(replyVisibility)
+		println(strings.Join(tags, ","))
 
 		println(images)
 		println(len(images))
-		for i, header := range images {
-			// if v.Size > MAX_UPLOAD_SIZE {
+		for _, header := range images {
+			if header.Size > MAX_UPLOAD_SIZE {
+				httpError(w, fmt.Sprintf("The uploaded image is too big: %s. Please use an image less than 1MB in size", header.Filename), http.StatusBadRequest)
+				return
+			}
+		}
 
-			// }
+		sql := fmt.Sprintf("select u_id from users where u_id = '%s'", publisherID)
+		db, rows := queryForRows(w, sql)
+		if db == nil || rows == nil {
+			return
+		}
+		defer db.Close()
+		defer rows.Close()
+
+		if !rows.Next() {
+			httpError(w, "Cannot find the publishder ID", http.StatusBadRequest)
+			return
+		}
+
+		visibility := ""
+		if postVisibility == "0" {
+			visibility = "all"
+		} else if postVisibility == "1" {
+			visibility = "follower"
+		} else if postVisibility == "2" {
+			visibility = "none"
+		}
+
+		reply := ""
+		if replyVisibility == "0" {
+			reply = "all"
+		} else if replyVisibility == "1" {
+			reply = "follower"
+		} else if replyVisibility == "2" {
+			reply = "none"
+		}
+
+		joinedTags := ""
+		// println(tags)
+		if len(tags) != 0 {
+			tags = deleteEmpty(tags)
+			joinedTags = strings.Join(tags, ",")
+			sql = fmt.Sprintf("call add_tags('%s')", joinedTags)
+			_, err := db.Exec(sql)
+			if err != nil {
+				httpError(w, "add tags go wrong"+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		// println(joinedTags)
+
+		sql = fmt.Sprintf("INSERT INTO posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visibility, p_reply, p_images_count, p_tags) VALUES ('%s',NOW(),NOW(),'%s','%s','%s','%d','%s')", publisherID, content, visibility, reply, len(images), joinedTags)
+		result, err := db.Exec(sql)
+		if err != nil {
+			httpError(w, "insert post error"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		id, err := result.LastInsertId()
+		if err != nil {
+			httpError(w, "Cannot get last inserted id"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		for i, header := range images {
 			file, err := header.Open()
 			if err != nil {
 				httpError(w, err.Error(), http.StatusInternalServerError)
@@ -827,11 +932,15 @@ func post(w http.ResponseWriter, r *http.Request) {
 			}
 			defer file.Close()
 			buff := make([]byte, 512)
+			print("before: ")
+			println(buff)
 			_, err = file.Read(buff)
 			if err != nil {
 				httpError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			print("after: ")
+			println(buff)
 			filetype := http.DetectContentType(buff)
 			println("file type is: " + filetype)
 			println(filepath.Ext(header.Filename))
@@ -844,12 +953,30 @@ func post(w http.ResponseWriter, r *http.Request) {
 				httpError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			f, err := os.Create(fmt.Sprintf("./uploads/posts/post_%d%s", i, filepath.Ext(header.Filename)))
+			ext := filepath.Ext(header.Filename)
+			println(header.Filename + "_" + ext)
+			err = os.MkdirAll("./uploads/posts", os.ModePerm)
+			if err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			f, err := os.Create(fmt.Sprintf("./uploads/posts/post_%d_%d", id, i))
 			if err != nil {
 				httpError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 			defer f.Close()
+
+			pr := &Progress{
+				TotalSize: header.Size,
+			}
+
+			_, err = io.Copy(f, io.TeeReader(file, pr))
+			if err != nil {
+				httpError(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 		}
 
 		fmt.Printf("r.MultipartForm.Value: %v\n", r.MultipartForm.Value)
@@ -857,36 +984,47 @@ func post(w http.ResponseWriter, r *http.Request) {
 
 	} else if err := checkRequestMethod(r, "get"); err == nil {
 		//get a post
-		getPost(w, r)
+		// getPost(w, r)
 	} else {
 		httpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func postPost(w http.ResponseWriter, r *http.Request) {
-	if checkRequestMethodReturn(w, r, "post") {
-		return
-	}
-
-	postBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
-	}
-
-	println(string(postBody[0:200]))
-	fmt.Printf("r.MultipartForm.Value: %v\n", r.MultipartForm.Value)
-	fmt.Printf("r.MultipartForm.Value: %v\n", r.MultipartForm.Value)
-	// content := r.MultipartForm.Value["content"]
-	// images := r.MultipartForm.Value["post_images"]
-	// println(content)
-	// println(images)
-}
-
-func getPost(w http.ResponseWriter, r *http.Request) {
+func getPostImage(w http.ResponseWriter, r *http.Request) {
 	if checkRequestMethodReturn(w, r, "get") {
 		return
 	}
 
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "id", "index") {
+		return
+	}
+
+	id := query["id"][0]
+	index_str := query["index"][0]
+
+	index, err := strconv.ParseInt(index_str, 0, 8)
+	if err != nil {
+		httpError(w, fmt.Sprintf("%s is not a valid number", index_str), http.StatusBadRequest)
+		return
+	}
+
+	if index < 0 || index > 10 {
+		httpError(w, fmt.Sprintf("%d is not within range", index), http.StatusBadRequest)
+		return
+	}
+
+	path := fmt.Sprintf("./uploads/posts/post_%s_%d", id, index)
+
+	bytes := getImage(path)
+	if bytes == nil {
+		httpError(w, "Cannot find file", http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(bytes)
 }
 
 func main() {
@@ -902,6 +1040,7 @@ func main() {
 	mux.HandleFunc("/validation/email/send", postSendValidationEmail) //post
 	mux.HandleFunc("/validation/email/validate", getValidateEmail)    //get
 	mux.HandleFunc("/post", post)                                     //post/get
+	mux.HandleFunc("/post/images", getPostImage)                      //get
 
 	if err := http.ListenAndServe(":4500", mux); err != nil {
 		log.Fatal(err)

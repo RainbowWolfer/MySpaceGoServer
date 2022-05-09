@@ -28,11 +28,26 @@ CREATE TABLE posts(
 	p_edit_times INT NOT NULL DEFAULT 0,
 	p_text_content TEXT NOT NULL DEFAULT(''),
 	p_deleted BOOL NOT NULL DEFAULT FALSE,
+	p_images_count INT NOT NULL DEFAULT 0,
+	p_tags VARCHAR(500) NOT NULL DEFAULT '',
 	p_upvotes INT NOT NULL DEFAULT 0,
 	p_downvotes INT NOT NULL DEFAULT 0,
 	p_visiblity ENUM('all','follower','none') NOT NULL DEFAULT 'all',
 	p_reply ENUM('all','follower','none') NOT NULL DEFAULT 'all'
 );
+
+DROP TABLE IF EXISTS tags;
+CREATE TABLE tags(
+	t_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	t_tag VARCHAR(40) NOT NULL UNIQUE
+);
+
+INSERT INTO tags (t_tag) VALUES ('%s')
+
+INSERT INTO 
+	posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visiblity, p_reply)
+VALUES
+	('','','','','','')
 
 SELECT * FROM users;
 
