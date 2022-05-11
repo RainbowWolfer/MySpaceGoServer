@@ -21,19 +21,34 @@ CREATE TABLE email_validations(
 
 DROP TABLE IF EXISTS posts;
 CREATE TABLE posts(
-	p_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-	p_publisher_id INT NOT NULL,
-	p_publish_date DATETIME NOT NULL,
-	p_edit_date DATETIME,
-	p_edit_times INT NOT NULL DEFAULT 0,
-	p_text_content TEXT NOT NULL DEFAULT(''),
-	p_deleted BOOL NOT NULL DEFAULT FALSE,
-	p_images_count INT NOT NULL DEFAULT 0,
-	p_tags VARCHAR(500) NOT NULL DEFAULT '',
-	p_upvotes INT NOT NULL DEFAULT 0,
-	p_downvotes INT NOT NULL DEFAULT 0,
-	p_visiblity ENUM('all','follower','none') NOT NULL DEFAULT 'all',
-	p_reply ENUM('all','follower','none') NOT NULL DEFAULT 'all'
+	p_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL, #Both
+	p_publisher_id INT NOT NULL, #Both
+	p_publish_date DATETIME NOT NULL, #Both
+	p_edit_date DATETIME, #Both
+	p_edit_times INT NOT NULL DEFAULT 0, #Both
+	p_text_content TEXT NOT NULL DEFAULT(''), #Both
+	p_deleted BOOL NOT NULL DEFAULT FALSE, #Both
+	p_images_count INT NOT NULL DEFAULT 0, #Post
+	p_tags VARCHAR(500) NOT NULL DEFAULT '', #Post
+	p_upvotes INT NOT NULL DEFAULT 0, #Both
+	p_downvotes INT NOT NULL DEFAULT 0, #Both
+	p_repost INT NOT NULL DEFAULT 0, #Post
+	p_visibility ENUM('all','follower','none') NOT NULL DEFAULT 'all', #Both
+	p_reply ENUM('all','follower','none') NOT NULL DEFAULT 'all', #Both
+	p_is_repost BOOL NOT NULL DEFAULT FALSE, #Repost
+	p_id_origin INT NOT NULL DEFAULT 0, #Repost
+	p_id_reposter INT NOT NULL DEFAULT 0 #Repost
+);
+
+DROP TABLE IF EXISTS comments;
+CREATE TABLE comments(
+	c_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	c_id_user INT NOT NULL,
+	c_id_post INT NOT NULL,
+	c_text_content TEXT NOT NULL,
+	c_datetime DATETIME NOT NULL,
+	c_upvotes INT NOT NULL DEFAULT 0,
+	c_downvote INT NOT NULL DEFAULT 0
 );
 
 DROP TABLE IF EXISTS tags;
@@ -42,17 +57,8 @@ CREATE TABLE tags(
 	t_tag VARCHAR(40) NOT NULL UNIQUE
 );
 
-INSERT INTO tags (t_tag) VALUES ('%s')
+INSERT INTO users VALUES(0,'myspace','myspace','RainbowWolfer@outlook.com','This is official account for MySpace. Feel free to tell us what improvoments should be made or just come small talking. All are welcomed!');
 
-INSERT INTO 
-	posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visiblity, p_reply)
-VALUES
-	('','','','','','')
+INSERT INTO posts VALUES(0,'0',NOW(),NOW(),0,'This is a test content',FALSE,0,'official,welcome,lucky',0,0,0,'all','all')
 
-SELECT * FROM users;
 
-SELECT u_avatarPath FROM users WHERE u_id = '1';
-
-SELECT u_id FROM users WHERE u_email = 'rainbowwolfer@outlook.com';
-
-UPDATE users SET u_avatarPath = 'a' WHERE u_id = '1';

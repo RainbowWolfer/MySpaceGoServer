@@ -17,6 +17,12 @@ SELECT ev_code,ev_email,ev_username,ev_password FROM email_validations WHERE ev_
 
 DELETE FROM email_validations
 	WHERE ev_email = 'rw@qq.com'
+	
+	
+	
+	
+SELECT * FROM posts ;
+	
 
 
 INSERT INTO users (u_username,u_password,u_email) VALUES ();

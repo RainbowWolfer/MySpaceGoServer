@@ -983,8 +983,18 @@ func post(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("r.MultipartForm.File: %v\n", r.MultipartForm.File)
 
 	} else if err := checkRequestMethod(r, "get"); err == nil {
-		//get a post
-		// getPost(w, r)
+		query := r.URL.Query()
+		
+		
+		
+		if query.Has("id") {
+			//logged in user
+			
+		} else {
+			//guest
+			
+		}
+
 	} else {
 		httpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
 	}
