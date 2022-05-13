@@ -21,7 +21,7 @@ DELETE FROM email_validations
 	
 	
 	
-SELECT * FROM posts ;
+SELECT * FROM posts ORDER BY p_publish_date DESC;
 	
 
 

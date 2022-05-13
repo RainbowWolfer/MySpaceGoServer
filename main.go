@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	_ "strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -88,6 +87,27 @@ type User struct {
 	Password           string
 	Email              string
 	ProfileDescription string
+}
+
+type Post struct {
+	ID           string
+	PublisherID  string
+	PublishDate  string
+	EditDate     string
+	EditTimes    int
+	TextContent  string
+	Deleted      bool
+	ImagesCount  int
+	Tags         string
+	Upvotes      int
+	Downvotes    int
+	Repost       int
+	Comment      int
+	Visibility   string
+	Reply        string
+	IsRepost     bool
+	OriginPostID string
+	ReposterID   string
 }
 
 func getIndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +333,7 @@ func getTryLogin(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, toJson(user))
 }
 
-func getUserHandler(w http.ResponseWriter, r *http.Request) {
+func getUser(w http.ResponseWriter, r *http.Request) {
 	if checkRequestMethodReturn(w, r, "get") {
 		return
 	}
@@ -324,12 +344,15 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var sql string
+	var errorMsg string
 	if query.Has("id") {
 		id := query["id"][0]
 		sql = fmt.Sprintf("SELECT * FROM users where u_id = '%s'", id)
+		errorMsg = "id of - " + id
 	} else if query.Has("username") {
 		username := query["username"][0]
 		sql = fmt.Sprintf("SELECT * FROM users where u_username = '%s'", username)
+		errorMsg = "username of - " + username
 	}
 
 	db, rows := queryForRows(w, sql)
@@ -339,28 +362,28 @@ func getUserHandler(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 	defer rows.Close()
 
-	var users []User
+	if !rows.Next() {
+		httpError(w, "Cannot find user with "+errorMsg, http.StatusBadRequest)
+		return
+	}
+	var user User
+	err := rows.Scan(
+		&user.ID,
+		&user.Username,
+		&user.Password,
+		&user.Email,
+		&user.ProfileDescription,
+	)
 
-	for rows.Next() {
-		var user User
-		err := rows.Scan(
-			&user.ID,
-			&user.Username,
-			&user.Password,
-			&user.Email,
-			&user.ProfileDescription,
-		)
-		if err != nil {
-			httpError(w, "User Convert Error", http.StatusInternalServerError)
-		}
-		users = append(users, user)
+	if err != nil {
+		httpError(w, "User Convert Error", http.StatusInternalServerError)
 	}
 
 	if err := rows.Err(); err != nil {
 		httpError(w, "Databse Rows Error", http.StatusInternalServerError)
 	}
 
-	fmt.Fprintln(w, toJson(users))
+	fmt.Fprintln(w, toJson(user))
 }
 
 func postUploadAvatar(w http.ResponseWriter, r *http.Request) {
@@ -984,17 +1007,88 @@ func post(w http.ResponseWriter, r *http.Request) {
 
 	} else if err := checkRequestMethod(r, "get"); err == nil {
 		query := r.URL.Query()
-		
-		
-		
-		if query.Has("id") {
-			//logged in user
-			
-		} else {
-			//guest
-			
+
+		if checkMissingParamters(w, query, true, "email", "password", "posts_type") {
+			return
 		}
 
+		email := query["email"][0]
+		password := query["password"][0]
+		posts_type := query["posts_type"][0]
+
+		//check user
+		sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", email, password)
+		db, rows := queryForRows(w, sql)
+		if db == nil || rows == nil {
+			return
+		}
+		defer db.Close()
+		defer rows.Close()
+
+		if !rows.Next() {
+			httpError(w, "Cannot find user", http.StatusBadRequest)
+			return
+		}
+
+		if posts_type == "All" {
+
+		} else if posts_type == "Hot" {
+
+		} else if posts_type == "Random" {
+
+		} else if posts_type == "Following" {
+
+		} else {
+			httpError(w, "Cannot find type of :"+posts_type, http.StatusBadRequest)
+			return
+		}
+
+		sql = "select * from posts order by p_publish_date DESC"
+		rows, err := db.Query(sql)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var posts []Post
+		for rows.Next() {
+			var post Post
+			err = rows.Scan(
+				&post.ID,
+				&post.PublisherID,
+				&post.PublishDate,
+				&post.EditDate,
+				&post.EditTimes,
+				&post.TextContent,
+				&post.Deleted,
+				&post.ImagesCount,
+				&post.Tags,
+				&post.Upvotes,
+				&post.Downvotes,
+				&post.Repost,
+				&post.Comment,
+				&post.Visibility,
+				&post.Reply,
+				&post.IsRepost,
+				&post.OriginPostID,
+				&post.ReposterID,
+			)
+			if err != nil {
+				println("skipping row" + err.Error())
+				continue
+			}
+			posts = append(posts, post)
+			fmt.Printf("%+v\n", post)
+		}
+
+		if err = rows.Err(); err != nil {
+			httpError(w, "Databse Rows Error", http.StatusInternalServerError)
+		}
+
+		json := toJson(posts)
+
+		println(json)
+		fmt.Fprintln(w, json)
 	} else {
 		httpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
 	}
@@ -1041,7 +1135,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", getIndexHandler)                              //get
-	mux.HandleFunc("/user", getUserHandler)                           //get
+	mux.HandleFunc("/user", getUser)                                  //get
 	mux.HandleFunc("/user/checkExisting", getCheckUserExist)          //get
 	mux.HandleFunc("/user/avatar", getAvatar)                         //get
 	mux.HandleFunc("/user/update/username", postUpdateUsername)       //post
