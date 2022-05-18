@@ -123,7 +123,7 @@ func readUser(rows *sql.Rows) (User, error) {
 		&user.Email,
 		&user.ProfileDescription,
 	); err != nil {
-		return User{}, errors.New("User Convert Error")
+		return User{}, errors.New("User Convert Error" + err.Error())
 	}
 	return user, nil
 }
@@ -198,24 +198,18 @@ func toJson(object any) string {
 	}
 }
 
-var database *sql.DB
-
-func getDatabase() *sql.DB {
-	if database != nil {
-		return database
-	}
+func getDatabase() (*sql.DB, error) {
 	var err error
-	database, err = sql.Open("mysql", "wjx:123456@tcp(www.cqtest.top:3306)/wjx")
+	database, err := sql.Open("mysql", "wjx:123456@tcp(www.cqtest.top:3306)/wjx")
 	println(fmt.Sprintf("Connection in use %d", database.Stats().InUse))
 	println("Open new Database Connection")
 	if err != nil {
-		println(err.Error())
-		return nil
+		return nil, err
 	}
 	database.SetConnMaxLifetime(time.Minute * 3)
-	database.SetMaxOpenConns(10)
-	database.SetMaxIdleConns(10)
-	return database
+	database.SetMaxOpenConns(100)
+	database.SetMaxIdleConns(100)
+	return database, nil
 }
 
 func checkRequestMethodReturn(w http.ResponseWriter, r *http.Request, method string) bool {
@@ -358,6 +352,13 @@ func getTryLogin(w http.ResponseWriter, r *http.Request) {
 	password := query["password"][0]
 	sql := fmt.Sprintf("select * from users where u_email='%s' and u_password='%s'", email, password)
 
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
 	rows, err := database.Query(sql)
 	if err != nil {
 		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
@@ -367,13 +368,13 @@ func getTryLogin(w http.ResponseWriter, r *http.Request) {
 
 	if !rows.Next() {
 		sql = fmt.Sprintf("SELECT ev_id FROM email_validations WHERE ev_email = '%s' AND ev_password = '%s'", email, password)
-		rows, err = database.Query(sql)
+		rows_ev, err := database.Query(sql)
 		if err != nil {
 			httpError(w, "Query Error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		if rows.Next() {
+		if rows_ev.Next() {
 			httpErrorWithCode(w, "User is in registration pending", http.StatusBadRequest, 1)
 			return
 		} else {
@@ -382,15 +383,11 @@ func getTryLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var user User
-	if err := rows.Scan(
-		&user.ID,
-		&user.Username,
-		&user.Password,
-		&user.Email,
-		&user.ProfileDescription,
-	); err != nil {
-		httpError(w, "User Convert Error", http.StatusInternalServerError)
+	user, err := readUser(rows)
+
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	fmt.Fprintln(w, toJson(user))
@@ -418,6 +415,13 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 		errorMsg = "username of - " + username
 	}
 
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
 	rows, err := database.Query(sql)
 	if err != nil {
 		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
@@ -429,21 +433,15 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "Cannot find user with "+errorMsg, http.StatusBadRequest)
 		return
 	}
-	var user User
-	err = rows.Scan(
-		&user.ID,
-		&user.Username,
-		&user.Password,
-		&user.Email,
-		&user.ProfileDescription,
-	)
+
+	user, err := readUser(rows)
 
 	if err != nil {
-		httpError(w, "User Convert Error", http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	if err := rows.Err(); err != nil {
-		httpError(w, "Databse Rows Error", http.StatusInternalServerError)
+		httpError(w, "Databse Rows Error"+err.Error(), http.StatusInternalServerError)
 	}
 
 	fmt.Fprintln(w, toJson(user))
@@ -509,6 +507,13 @@ func postUploadAvatar(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
 
 	sql := fmt.Sprintf("select u_id from users where u_id = '%s'", id)
 	rows, err := database.Query(sql)
@@ -680,6 +685,13 @@ func postSendValidationEmail(w http.ResponseWriter, r *http.Request) {
 
 	sql := fmt.Sprintf("select u_id FROM users where u_email = '%s' or u_username = '%s'", email_query, username_query)
 
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
 	rows, err := database.Query(sql)
 	if err != nil {
 		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
@@ -765,6 +777,13 @@ func getValidateEmail(w http.ResponseWriter, r *http.Request) {
 
 	sql := fmt.Sprintf("SELECT ev_code,ev_email,ev_username,ev_password FROM email_validations WHERE ev_email = '%s' AND ev_datetime <= NOW()", email)
 
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
 	rows, err := database.Query(sql)
 	if err != nil {
 		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
@@ -828,6 +847,13 @@ func getCheckUserExist(w http.ResponseWriter, r *http.Request) {
 		sql = fmt.Sprintf("SELECT u_id FROM users where u_email = '%s'", email)
 	}
 
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
 	rows, err := database.Query(sql)
 	if err != nil {
 		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
@@ -883,6 +909,13 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 		httpError(w, errorMessage, http.StatusBadRequest)
 		return
 	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
 
 	sql := fmt.Sprintf("SELECT u_id FROM users WHERE u_username = '%s'", obj.NewUsername)
 	rows, err := database.Query(sql)
@@ -944,6 +977,13 @@ func post(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+
+		database, err := getDatabase()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer database.Close()
 
 		sql := fmt.Sprintf("select u_id from users where u_id = '%s'", publisherID)
 		rows, err := database.Query(sql)
@@ -1080,6 +1120,13 @@ func post(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		database, err := getDatabase()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer database.Close()
+
 		println(database.Stats().Idle)
 		println(database.Stats().InUse)
 
@@ -1102,12 +1149,11 @@ func post(w http.ResponseWriter, r *http.Request) {
 					httpError(w, "Cannot find user", http.StatusBadRequest)
 					return
 				}
-				user, err := readUser(rows)
-				if err != nil {
+
+				if err = rows.Scan(&user_id); err != nil {
 					httpError(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				user_id = user.ID
 			}
 		}
 
@@ -1230,7 +1276,14 @@ func reinflateDefaultPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := database.Exec("DELETE FROM posts;")
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	_, err = database.Exec("DELETE FROM posts;")
 	if err != nil {
 		httpError(w, "delete error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -1299,8 +1352,6 @@ func reinflateDefaultPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	getDatabase()
-
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", getIndexHandler)                              //get
