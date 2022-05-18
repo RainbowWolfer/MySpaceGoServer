@@ -79,10 +79,22 @@ CREATE TABLE comment_likes(
 	cl_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
 	cl_id_user INT NOT NULL,
 	cl_id_comment INT NOT NULL,
-	pl_vote BOOL NOT NULL,
-	pl_datetime DATETIME NOT NULL,
+	cl_vote BOOL NOT NULL,
+	cl_datetime DATETIME NOT NULL,
 	CONSTRAINT fk_cl_id_user FOREIGN KEY (cl_id_user) REFERENCES users(u_id),
 	CONSTRAINT fk_cl_id_comment FOREIGN KEY (cl_id_comment) REFERENCES comments(c_id)
+);
+
+DROP TABLE IF EXISTS users_follows;
+CREATE TABLE users_follows(
+	uf_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	uf_id_follower INT NOT NULL,
+	uf_id_target INT NOT NULL,
+	uf_time DATETIME NOT NULL DEFAULT(NOW()),
+	CONSTRAINT kf_uf_id_follower FOREIGN KEY (uf_id_follower) REFERENCES users(u_id),
+	CONSTRAINT kf_uf_id_target FOREIGN KEY (uf_id_target) REFERENCES users(u_id),
+	CONSTRAINT unique_follower_target UNIQUE(uf_id_follower, uf_id_target),
+	CHECK (uf_id_follower <> uf_id_target)
 );
 
 SET FOREIGN_KEY_CHECKS = 1;

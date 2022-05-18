@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	_ "context"
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
@@ -11,12 +12,14 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/mail"
 	"net/smtp"
 	"net/url"
 	"os"
 	"path/filepath"
+	_ "regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -82,7 +85,7 @@ func (pr *Progress) Print() {
 }
 
 type User struct {
-	ID                 string
+	ID                 int
 	Username           string
 	Password           string
 	Email              string
@@ -108,6 +111,69 @@ type Post struct {
 	IsRepost     bool
 	OriginPostID string
 	ReposterID   string
+	Score        int //only for rows scan
+}
+
+func readUser(rows *sql.Rows) (User, error) {
+	var user User
+	if err := rows.Scan(
+		&user.ID,
+		&user.Username,
+		&user.Password,
+		&user.Email,
+		&user.ProfileDescription,
+	); err != nil {
+		return User{}, errors.New("User Convert Error")
+	}
+	return user, nil
+}
+
+func readPost(rows *sql.Rows) (Post, error) {
+	var post Post
+	err := rows.Scan(
+		&post.ID,
+		&post.PublisherID,
+		&post.PublishDate,
+		&post.EditDate,
+		&post.EditTimes,
+		&post.TextContent,
+		&post.Deleted,
+		&post.ImagesCount,
+		&post.Tags,
+		&post.Upvotes,
+		&post.Downvotes,
+		&post.Repost,
+		&post.Comment,
+		&post.Visibility,
+		&post.Reply,
+		&post.IsRepost,
+		&post.OriginPostID,
+		&post.ReposterID,
+	)
+	if err != nil {
+		err = rows.Scan(
+			&post.ID,
+			&post.PublisherID,
+			&post.PublishDate,
+			&post.EditDate,
+			&post.EditTimes,
+			&post.TextContent,
+			&post.Deleted,
+			&post.ImagesCount,
+			&post.Tags,
+			&post.Upvotes,
+			&post.Downvotes,
+			&post.Repost,
+			&post.Comment,
+			&post.Visibility,
+			&post.Reply,
+			&post.IsRepost,
+			&post.OriginPostID,
+			&post.ReposterID,
+			&post.Score,
+		)
+	}
+	return post, err
 }
 
 func getIndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -132,19 +198,28 @@ func toJson(object any) string {
 	}
 }
 
-func getDatabase(w http.ResponseWriter) (*sql.DB, error) {
-	db, err := sql.Open("mysql", "wjx:123456@tcp(www.cqtest.top:3306)/wjx")
-	if err != nil {
-		return nil, err
+var database *sql.DB
+
+func getDatabase() *sql.DB {
+	if database != nil {
+		return database
 	}
-	db.SetConnMaxLifetime(time.Minute * 3)
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
-	return db, nil
+	var err error
+	database, err = sql.Open("mysql", "wjx:123456@tcp(www.cqtest.top:3306)/wjx")
+	println(fmt.Sprintf("Connection in use %d", database.Stats().InUse))
+	println("Open new Database Connection")
+	if err != nil {
+		println(err.Error())
+		return nil
+	}
+	database.SetConnMaxLifetime(time.Minute * 3)
+	database.SetMaxOpenConns(10)
+	database.SetMaxIdleConns(10)
+	return database
 }
 
 func checkRequestMethodReturn(w http.ResponseWriter, r *http.Request, method string) bool {
-	println(r.URL.RawPath)
+	// println(r.URL.RawPath)
 	if !strings.EqualFold(r.Method, method) {
 		httpError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return true
@@ -154,7 +229,7 @@ func checkRequestMethodReturn(w http.ResponseWriter, r *http.Request, method str
 }
 
 func checkRequestMethod(r *http.Request, method string) error {
-	println(r.URL.RawPath)
+	// println(r.URL.RawPath)
 	if strings.EqualFold(r.Method, method) {
 		return nil
 	} else {
@@ -164,16 +239,16 @@ func checkRequestMethod(r *http.Request, method string) error {
 
 func isEmpty(str *string) bool {
 	if str == nil {
-		return false
+		return true
 	}
 	if len(*str) == 0 {
-		return false
+		return true
 	}
 	if len(strings.TrimSpace(*str)) == 0 {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 // func unmarshallPostBody[T *any](r *http.Request) (T, error) {
@@ -236,30 +311,18 @@ func deleteEmpty(s []string) []string {
 	return r
 }
 
-func queryForRows(w http.ResponseWriter, sql string) (*sql.DB, *sql.Rows) {
-	db, err := getDatabase(w)
-	if err != nil {
-		httpError(w, "Database Error", http.StatusInternalServerError)
-	}
-	rows, err := db.Query(sql)
-	if err != nil {
-		httpError(w, "Query Error with :"+sql, http.StatusInternalServerError)
-	}
-	return db, rows
-}
-
 func getImage(path string) []byte {
 	availableExts := []string{"", ".png", ".jpg", ".jpeg"}
 	var bytes []byte = nil
 	for _, ext := range availableExts {
 		p := fmt.Sprintf("%s%s", path, ext)
-		println("getting file: " + p)
+		// println("getting file: " + p)
 		fileBytes, err := ioutil.ReadFile(p)
 		if err != nil {
-			println("not found")
+			// println("not found")
 			continue
 		}
-		println("found!")
+		// println("found!")
 		bytes = fileBytes
 		break
 	}
@@ -295,16 +358,16 @@ func getTryLogin(w http.ResponseWriter, r *http.Request) {
 	password := query["password"][0]
 	sql := fmt.Sprintf("select * from users where u_email='%s' and u_password='%s'", email, password)
 
-	db, rows := queryForRows(w, sql)
-	if db == nil || rows == nil {
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer db.Close()
 	defer rows.Close()
 
 	if !rows.Next() {
 		sql = fmt.Sprintf("SELECT ev_id FROM email_validations WHERE ev_email = '%s' AND ev_password = '%s'", email, password)
-		rows, err := db.Query(sql)
+		rows, err = database.Query(sql)
 		if err != nil {
 			httpError(w, "Query Error: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -355,11 +418,11 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 		errorMsg = "username of - " + username
 	}
 
-	db, rows := queryForRows(w, sql)
-	if db == nil || rows == nil {
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer db.Close()
 	defer rows.Close()
 
 	if !rows.Next() {
@@ -367,7 +430,7 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var user User
-	err := rows.Scan(
+	err = rows.Scan(
 		&user.ID,
 		&user.Username,
 		&user.Password,
@@ -433,7 +496,7 @@ func postUploadAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	println(buff)
+	// println(buff)
 
 	filetype := http.DetectContentType(buff)
 	if filetype != "image/jpeg" && filetype != "image/jpg" && filetype != "image/png" {
@@ -448,11 +511,11 @@ func postUploadAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql := fmt.Sprintf("select u_id from users where u_id = '%s'", id)
-	db, rows := queryForRows(w, sql)
-	if db == nil || rows == nil {
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer db.Close()
 	defer rows.Close()
 
 	foundUser := rows.Next()
@@ -488,7 +551,7 @@ func postUploadAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//this is file path in project directory
-	println(f.Name())
+	// println(f.Name())
 
 	// sql = fmt.Sprintf("UPDATE users SET u_avatarPath = '%s' WHERE u_id = '%s';", f.Name(), id)
 	// if rows, err = db.Query(sql); err != nil {
@@ -529,8 +592,8 @@ func getAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	println(bytes)
-	println(bytes == nil)
+	// println(bytes)
+	// println(bytes == nil)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(bytes)
@@ -617,11 +680,11 @@ func postSendValidationEmail(w http.ResponseWriter, r *http.Request) {
 
 	sql := fmt.Sprintf("select u_id FROM users where u_email = '%s' or u_username = '%s'", email_query, username_query)
 
-	db, rows := queryForRows(w, sql)
-	if db == nil || rows == nil {
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer db.Close()
 	defer rows.Close()
 
 	if rows.Next() {
@@ -630,7 +693,7 @@ func postSendValidationEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql = fmt.Sprintf("select ev_id FROM email_validations where ev_email = '%s'", email_query)
-	rows, err = db.Query(sql)
+	rows, err = database.Query(sql)
 	if err != nil {
 		httpError(w, "sql query error", http.StatusInternalServerError)
 		return
@@ -677,7 +740,7 @@ func postSendValidationEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql = fmt.Sprintf("INSERT INTO email_validations (ev_email,ev_username,ev_password,ev_code,ev_datetime) VALUES ('%s','%s','%s','%s',NOW())", email_query, username_query, password_query, code)
-	_, err = db.Exec(sql)
+	_, err = database.Exec(sql)
 	if err != nil {
 		httpError(w, "insert data failed :"+err.Error(), http.StatusBadRequest)
 		return
@@ -702,11 +765,11 @@ func getValidateEmail(w http.ResponseWriter, r *http.Request) {
 
 	sql := fmt.Sprintf("SELECT ev_code,ev_email,ev_username,ev_password FROM email_validations WHERE ev_email = '%s' AND ev_datetime <= NOW()", email)
 
-	db, rows := queryForRows(w, sql)
-	if db == nil || rows == nil {
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer db.Close()
 	defer rows.Close()
 
 	if !rows.Next() {
@@ -728,7 +791,7 @@ func getValidateEmail(w http.ResponseWriter, r *http.Request) {
 
 	//delete validation
 	sql = fmt.Sprintf("DELETE FROM email_validations WHERE ev_email = '%s'", db_email)
-	_, err := db.Exec(sql)
+	_, err = database.Exec(sql)
 	if err != nil {
 		httpError(w, "database delete validation failed\n"+err.Error(), http.StatusInternalServerError)
 		return
@@ -736,7 +799,7 @@ func getValidateEmail(w http.ResponseWriter, r *http.Request) {
 
 	//add new user
 	sql = fmt.Sprintf("INSERT INTO users (u_username,u_password,u_email) VALUES ('%s','%s','%s')", db_username, db_password, db_email)
-	_, err = db.Exec(sql)
+	_, err = database.Exec(sql)
 	if err != nil {
 		httpError(w, "database insert new user failed\n"+err.Error(), http.StatusInternalServerError)
 		return
@@ -765,11 +828,11 @@ func getCheckUserExist(w http.ResponseWriter, r *http.Request) {
 		sql = fmt.Sprintf("SELECT u_id FROM users where u_email = '%s'", email)
 	}
 
-	db, rows := queryForRows(w, sql)
-	if db == nil || rows == nil {
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer db.Close()
 	defer rows.Close()
 
 	foundUser := rows.Next()
@@ -821,14 +884,8 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := getDatabase(w)
-	if err != nil {
-		httpError(w, "Database Error :"+err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	sql := fmt.Sprintf("SELECT u_id FROM users WHERE u_username = '%s'", obj.NewUsername)
-	rows, err := db.Query(sql)
+	rows, err := database.Query(sql)
 
 	if rows.Next() || err != nil {
 		httpError(w, fmt.Sprintf("There is already a user named (%s)", obj.NewUsername), http.StatusBadRequest)
@@ -837,7 +894,7 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 
 	sql = fmt.Sprintf("UPDATE users SET u_username = '%s' WHERE u_id = '%s' AND u_username = '%s' AND u_password = '%s';", obj.NewUsername, obj.Id, obj.Username, obj.Password)
 
-	res, err := db.Exec(sql)
+	res, err := database.Exec(sql)
 	if err != nil {
 		httpError(w, "Query Error with :"+sql, http.StatusBadRequest)
 		return
@@ -848,7 +905,6 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer db.Close()
 	fmt.Fprintln(w, rowsAffected)
 }
 
@@ -865,8 +921,8 @@ func post(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		println(r.MultipartForm.File)
-		println(r.MultipartForm.Value)
+		// println(r.MultipartForm.File)
+		// println(r.MultipartForm.Value)
 
 		content := r.MultipartForm.Value["content"][0]
 		publisherID := r.MultipartForm.Value["publisher_id"][0]
@@ -874,14 +930,14 @@ func post(w http.ResponseWriter, r *http.Request) {
 		replyVisibility := r.MultipartForm.Value["reply_visibility"][0]
 		tags := strings.Split(r.MultipartForm.Value["tags"][0], "&#10;")
 		images := r.MultipartForm.File["post_images"]
-		println("content is : " + content)
-		println(publisherID)
-		println(postVisibility)
-		println(replyVisibility)
-		println(strings.Join(tags, ","))
+		// println("content is : " + content)
+		// println(publisherID)
+		// println(postVisibility)
+		// println(replyVisibility)
+		// println(strings.Join(tags, ","))
 
-		println(images)
-		println(len(images))
+		// println(images)
+		// println(len(images))
 		for _, header := range images {
 			if header.Size > MAX_UPLOAD_SIZE {
 				httpError(w, fmt.Sprintf("The uploaded image is too big: %s. Please use an image less than 1MB in size", header.Filename), http.StatusBadRequest)
@@ -890,11 +946,11 @@ func post(w http.ResponseWriter, r *http.Request) {
 		}
 
 		sql := fmt.Sprintf("select u_id from users where u_id = '%s'", publisherID)
-		db, rows := queryForRows(w, sql)
-		if db == nil || rows == nil {
+		rows, err := database.Query(sql)
+		if err != nil {
+			httpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer db.Close()
 		defer rows.Close()
 
 		if !rows.Next() {
@@ -926,7 +982,7 @@ func post(w http.ResponseWriter, r *http.Request) {
 			tags = deleteEmpty(tags)
 			joinedTags = strings.Join(tags, ",")
 			sql = fmt.Sprintf("call add_tags('%s')", joinedTags)
-			_, err := db.Exec(sql)
+			_, err := database.Exec(sql)
 			if err != nil {
 				httpError(w, "add tags go wrong"+err.Error(), http.StatusInternalServerError)
 				return
@@ -935,7 +991,7 @@ func post(w http.ResponseWriter, r *http.Request) {
 		// println(joinedTags)
 
 		sql = fmt.Sprintf("INSERT INTO posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visibility, p_reply, p_images_count, p_tags) VALUES ('%s',NOW(),NOW(),'%s','%s','%s','%d','%s')", publisherID, content, visibility, reply, len(images), joinedTags)
-		result, err := db.Exec(sql)
+		result, err := database.Exec(sql)
 		if err != nil {
 			httpError(w, "insert post error"+err.Error(), http.StatusInternalServerError)
 			return
@@ -955,18 +1011,18 @@ func post(w http.ResponseWriter, r *http.Request) {
 			}
 			defer file.Close()
 			buff := make([]byte, 512)
-			print("before: ")
-			println(buff)
+			// print("before: ")
+			// println(buff)
 			_, err = file.Read(buff)
 			if err != nil {
 				httpError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			print("after: ")
-			println(buff)
+			// print("after: ")
+			// println(buff)
 			filetype := http.DetectContentType(buff)
-			println("file type is: " + filetype)
-			println(filepath.Ext(header.Filename))
+			// println("file type is: " + filetype)
+			// println(filepath.Ext(header.Filename))
 			if filetype != "image/jpeg" && filetype != "image/jpg" && filetype != "image/png" {
 				httpError(w, "The provided file format is not allowed. Please upload a JPEG(JPG) or PNG image", http.StatusBadRequest)
 				continue
@@ -1008,43 +1064,80 @@ func post(w http.ResponseWriter, r *http.Request) {
 	} else if err := checkRequestMethod(r, "get"); err == nil {
 		query := r.URL.Query()
 
-		if checkMissingParamters(w, query, true, "email", "password", "posts_type") {
+		if checkMissingParamters(w, query, true, "posts_type", "offset") {
 			return
 		}
 
-		email := query["email"][0]
-		password := query["password"][0]
 		posts_type := query["posts_type"][0]
+		offset := query["offset"][0]
 
-		//check user
-		sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", email, password)
-		db, rows := queryForRows(w, sql)
-		if db == nil || rows == nil {
-			return
-		}
-		defer db.Close()
-		defer rows.Close()
-
-		if !rows.Next() {
-			httpError(w, "Cannot find user", http.StatusBadRequest)
-			return
+		limit := 10
+		if query.Has("limit") {
+			limit, err = strconv.Atoi(query["limit"][0])
+			if err != nil {
+				httpError(w, "limit is not a valid number"+err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 
-		if posts_type == "All" {
+		println(database.Stats().Idle)
+		println(database.Stats().InUse)
 
-		} else if posts_type == "Hot" {
+		println(database.Stats().OpenConnections)
+		println(database.Stats().WaitDuration)
 
-		} else if posts_type == "Random" {
+		user_id := -1
+		if query.Has("email") && query.Has("password") {
+			email := query["email"][0]
+			password := query["password"][0]
+			if !isEmpty(&email) && !isEmpty(&password) {
+				sql_user := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", email, password)
+				rows, err := database.Query(sql_user)
+				if err != nil {
+					httpError(w, "query user error"+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				defer rows.Close()
+				if !rows.Next() {
+					httpError(w, "Cannot find user", http.StatusBadRequest)
+					return
+				}
+				user, err := readUser(rows)
+				if err != nil {
+					httpError(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				user_id = user.ID
+			}
+		}
 
-		} else if posts_type == "Following" {
+		var sql string
 
+		if strings.EqualFold(posts_type, "All") { //time based
+			sql = fmt.Sprintf("CALL GetPostsByTime(%d,%s,%d);", user_id, offset, limit)
+		} else if strings.EqualFold(posts_type, "Hot") {
+			sql = fmt.Sprintf("CALL GetPostsByScore(%d,%s,%d)", user_id, offset, limit)
+		} else if strings.EqualFold(posts_type, "Random") {
+			if !query.Has("seed") {
+				httpError(w, "require parameter 'seed'", http.StatusBadRequest)
+				return
+			}
+			seed := query["seed"][0]
+			sql = fmt.Sprintf("CALL GetPostsByRandom(%d,%s,%d,%s)", user_id, offset, limit, seed)
+		} else if strings.EqualFold(posts_type, "Following") {
+			if user_id == 0 || user_id == -1 {
+				httpError(w, "user not found", http.StatusBadRequest)
+				return
+			}
+			sql = fmt.Sprintf("CALL GetPostsByFollow(%d,%s,%d)", user_id, offset, limit)
 		} else {
 			httpError(w, "Cannot find type of :"+posts_type, http.StatusBadRequest)
 			return
 		}
 
-		sql = "select * from posts order by p_publish_date DESC"
-		rows, err := db.Query(sql)
+		println("HERE")
+		rows, err := database.Query(sql)
+		println("END")
 		if err != nil {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1052,33 +1145,13 @@ func post(w http.ResponseWriter, r *http.Request) {
 
 		var posts []Post
 		for rows.Next() {
-			var post Post
-			err = rows.Scan(
-				&post.ID,
-				&post.PublisherID,
-				&post.PublishDate,
-				&post.EditDate,
-				&post.EditTimes,
-				&post.TextContent,
-				&post.Deleted,
-				&post.ImagesCount,
-				&post.Tags,
-				&post.Upvotes,
-				&post.Downvotes,
-				&post.Repost,
-				&post.Comment,
-				&post.Visibility,
-				&post.Reply,
-				&post.IsRepost,
-				&post.OriginPostID,
-				&post.ReposterID,
-			)
+			post, err := readPost(rows)
 			if err != nil {
 				println("skipping row" + err.Error())
 				continue
 			}
 			posts = append(posts, post)
-			fmt.Printf("%+v\n", post)
+			// fmt.Printf("%+v\n", post)
 		}
 
 		if err = rows.Err(); err != nil {
@@ -1087,7 +1160,7 @@ func post(w http.ResponseWriter, r *http.Request) {
 
 		json := toJson(posts)
 
-		println(json)
+		// println(json)
 		fmt.Fprintln(w, json)
 	} else {
 		httpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
@@ -1131,7 +1204,103 @@ func getPostImage(w http.ResponseWriter, r *http.Request) {
 	w.Write(bytes)
 }
 
+func clearUnusedPostImages(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "key") {
+		return
+	}
+
+}
+
+func reinflateDefaultPosts(w http.ResponseWriter, r *http.Request) {
+	rand.Seed(time.Now().UnixNano())
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "key") {
+		return
+	}
+	key := query["key"][0]
+	if key != "eb9f60e5c17ec16a7dfbf79321b79afa" {
+		httpError(w, "key error", http.StatusBadRequest)
+		return
+	}
+
+	_, err := database.Exec("DELETE FROM posts;")
+	if err != nil {
+		httpError(w, "delete error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = database.Exec("DELETE FROM users;")
+	if err != nil {
+		httpError(w, "delete error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sql := "INSERT INTO users VALUES (1,'myspace','myspace','RainbowWolfer@outlook.com','This is official account for MySpace. Feel free to tell us what improvoments should be made or just come small talking. All are welcomed!');"
+	// println(sql)
+	_, err = database.Exec(sql)
+
+	if err != nil {
+		httpError(w, "insert user error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	usersCount := rand.Intn(20) + 2
+
+	for i := 2; i < usersCount; i++ {
+		sql = fmt.Sprintf("INSERT INTO users VALUES (%d,'Test Dummy %d','123456','%d@test.com','Test Dummy #%d');", i, i, i, i)
+		// println(sql)
+		_, err = database.Exec(sql)
+
+		if err != nil {
+			httpError(w, "insert user error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	list := []string{
+		"Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book.",
+		" It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.",
+		"It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. ",
+		"The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using \"Content here, content here\", making it look like readable English. ",
+		"Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for \"lorem ipsum\" will uncover many web sites still in their infancy. ",
+		"Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).",
+		"Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source.",
+		"Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of \"de Finibus Bonorum et Malorum\" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, \"Lorem ipsum dolor sit amet..\", comes from a line in section 1.10.32.",
+		"The standard chunk of Lorem Ipsum used since the 1500s is reproduced below for those interested.",
+		"Sections 1.10.32 and 1.10.33 from \"de Finibus Bonorum et Malorum\" by Cicero are also reproduced in their exact original form, accompanied by English versions from the 1914 translation by H. Rackham.",
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vitae finibus metus. Etiam ultrices magna vitae ligula sodales suscipit. Sed eu nibh in dolor pharetra varius vitae sit amet dolor.",
+		"Morbi auctor pharetra ipsum vitae tempus. Sed risus risus, iaculis eget sapien eu, suscipit vulputate nulla.",
+		"Donec vel purus non lacus euismod imperdiet eu tempus sapien. Donec non dui sed odio eleifend sagittis quis commodo enim. Proin nec magna sem.",
+	}
+
+	random := rand.Intn(100)
+	println(random)
+	for i := 1; i < random+100; i++ {
+		text := list[rand.Intn(len(list))]
+		publisher_id := rand.Intn(usersCount-1) + 1
+		sql = fmt.Sprintf("INSERT INTO posts VALUES (%d,%d, TIMESTAMPADD(SECOND,%d,NOW()), TIMESTAMPADD(SECOND,%d,NOW()),0,'%s',FALSE,0,'official,test,LoremIpsum',%d,%d,0,0,'all','all',FALSE,-1,-1);", i, publisher_id, i, i, text, rand.Intn(500), rand.Intn(100))
+		// println(sql)
+		_, err = database.Exec(sql)
+
+		if err != nil {
+			httpError(w, "insert data error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	fmt.Fprintf(w, "Successfully infalte default data (%d) with users (%d)", random+100, usersCount-1)
+	// println(database)
+}
+
 func main() {
+	getDatabase()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", getIndexHandler)                              //get
@@ -1145,6 +1314,9 @@ func main() {
 	mux.HandleFunc("/validation/email/validate", getValidateEmail)    //get
 	mux.HandleFunc("/post", post)                                     //post/get
 	mux.HandleFunc("/post/images", getPostImage)                      //get
+
+	mux.HandleFunc("/admin/clearunusedpostimages", clearUnusedPostImages)
+	mux.HandleFunc("/admin/reinflatedefaultposts", reinflateDefaultPosts)
 
 	if err := http.ListenAndServe(":4500", mux); err != nil {
 		log.Fatal(err)
