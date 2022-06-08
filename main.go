@@ -64,6 +64,12 @@ func httpErrorWithCode(w http.ResponseWriter, content string, code int, errorCod
 	http.Error(w, json, code)
 }
 
+func now() string {
+	dt := time.Now()
+	//Format MM-DD-YYYY hh:mm:ss
+	return dt.Format("2006-01-02 15:04:05")
+}
+
 type Progress struct {
 	TotalSize int64
 	BytesRead int64
@@ -93,25 +99,79 @@ type User struct {
 }
 
 type Post struct {
-	ID           string
-	PublisherID  string
-	PublishDate  string
-	EditDate     string
-	EditTimes    int
-	TextContent  string
-	Deleted      bool
-	ImagesCount  int
-	Tags         string
-	Upvotes      int
-	Downvotes    int
-	Repost       int
-	Comment      int
-	Visibility   string
-	Reply        string
-	IsRepost     bool
-	OriginPostID string
-	ReposterID   string
-	Score        int //only for rows scan
+	ID                 string
+	PublisherID        string
+	PublishDate        string
+	EditDate           string
+	EditTimes          int
+	TextContent        string
+	Deleted            bool
+	ImagesCount        int
+	Tags               string
+	Visibility         string
+	Reply              string
+	IsRepost           bool
+	OriginPostID       string
+	Upvotes            int
+	Downvotes          int
+	Comments           int
+	Reposts            int
+	PublisherUsername  string
+	PublisherEmail     string
+	PublisherProfile   string
+	OriginUserID       *string
+	OriginUserUsername *string
+	OriginUserEmail    *string
+	OriginUserProfile  *string
+	OriginPublishDate  *string
+	OriginEditDate     *string
+	OriginEditTimes    *int
+	OriginTextContent  *string
+	OriginDeleted      *bool
+	OriginImagesCount  *int
+	OriginTags         *string
+	OriginVisibility   *string
+	OriginReply        *string
+	OriginIsRepost     *bool
+	OriginOriginPostID *string
+	OriginUpvotes      int
+	OriginDownvotes    int
+	OriginComments     int
+	OriginReposts      int
+	Score              int
+	Voted              int //-1(undefined) 0(downvoted) 1(upvoted)
+	OriginScore        *int
+	OriginVoted        *int
+}
+
+type Comment struct {
+	ID          string
+	UserID      string
+	PostID      string
+	TextContent string
+	DateTime    string
+	Upvotes     int
+	Downvotes   int
+}
+
+type NewVote struct {
+	PostID   string `json:"post_id"`
+	UserID   string `json:"user_id"`
+	Cancel   bool   `json:"cancel"`
+	Score    int    `json:"score"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type NewRepost struct {
+	OriginPostID   string   `json:"origin_post_id"`
+	PublisherID    string   `json:"publisher_id"`
+	TextContent    string   `json:"text_content"`
+	PostVisibility string   `json:"post_visibility"`
+	ReplyLimit     string   `json:"reply_limit"`
+	Tags           []string `json:"tags"`
+	Email          string   `json:"email"`
+	Password       string   `json:"password"`
 }
 
 func readUser(rows *sql.Rows) (User, error) {
@@ -140,39 +200,41 @@ func readPost(rows *sql.Rows) (Post, error) {
 		&post.Deleted,
 		&post.ImagesCount,
 		&post.Tags,
-		&post.Upvotes,
-		&post.Downvotes,
-		&post.Repost,
-		&post.Comment,
 		&post.Visibility,
 		&post.Reply,
 		&post.IsRepost,
 		&post.OriginPostID,
-		&post.ReposterID,
+		&post.Upvotes,
+		&post.Downvotes,
+		&post.Comments,
+		&post.Reposts,
+		&post.PublisherUsername,
+		&post.PublisherEmail,
+		&post.PublisherProfile,
+		&post.OriginUserID,
+		&post.OriginUserUsername,
+		&post.OriginUserEmail,
+		&post.OriginUserProfile,
+		&post.OriginPublishDate,
+		&post.OriginEditDate,
+		&post.OriginEditTimes,
+		&post.OriginTextContent,
+		&post.OriginDeleted,
+		&post.OriginImagesCount,
+		&post.OriginTags,
+		&post.OriginVisibility,
+		&post.OriginReply,
+		&post.OriginIsRepost,
+		&post.OriginOriginPostID,
+		&post.OriginUpvotes,
+		&post.OriginDownvotes,
+		&post.OriginComments,
+		&post.OriginReposts,
+		&post.Score,
+		&post.Voted,
+		&post.OriginScore,
+		&post.OriginVoted,
 	)
-	if err != nil {
-		err = rows.Scan(
-			&post.ID,
-			&post.PublisherID,
-			&post.PublishDate,
-			&post.EditDate,
-			&post.EditTimes,
-			&post.TextContent,
-			&post.Deleted,
-			&post.ImagesCount,
-			&post.Tags,
-			&post.Upvotes,
-			&post.Downvotes,
-			&post.Repost,
-			&post.Comment,
-			&post.Visibility,
-			&post.Reply,
-			&post.IsRepost,
-			&post.OriginPostID,
-			&post.ReposterID,
-			&post.Score,
-		)
-	}
 	return post, err
 }
 
@@ -206,9 +268,9 @@ func getDatabase() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	database.SetConnMaxLifetime(time.Minute * 3)
-	database.SetMaxOpenConns(100)
-	database.SetMaxIdleConns(100)
+	database.SetConnMaxLifetime(time.Second * 10)
+	database.SetMaxOpenConns(500)
+	database.SetMaxIdleConns(500)
 	return database, nil
 }
 
@@ -243,6 +305,24 @@ func isEmpty(str *string) bool {
 	}
 
 	return false
+}
+
+func checkUser(db *sql.DB, email string, pasword string) (int, error) {
+	sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s';", email, pasword)
+	println(sql)
+	rows, err := db.Query(sql)
+	if err != nil {
+		return -1, err
+	}
+	if !rows.Next() {
+		return -1, nil
+	}
+	var userID int
+	err = rows.Scan(&userID)
+	if err != nil {
+		return -1, err
+	}
+	return userID, nil
 }
 
 // func unmarshallPostBody[T *any](r *http.Request) (T, error) {
@@ -867,12 +947,21 @@ func getCheckUserExist(w http.ResponseWriter, r *http.Request) {
 }
 
 type NewUsername struct {
-	Id          string `json:"id"`
+	ID          string `json:"id"`
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	NewUsername string `json:"new_username"`
 }
+type NewComment struct {
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	PostID      string `json:"post_id"`
+	TextContent string `json:"text_content"`
+}
 
+//Update Username - Post
+//Error Code ->
+//1-username taken
 func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 	if checkRequestMethodReturn(w, r, "post") {
 		return
@@ -893,7 +982,7 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 	}
 
 	errorMessage := ""
-	if isEmpty(&obj.Id) {
+	if isEmpty(&obj.ID) {
 		errorMessage += "Missing paramter 'id'\n"
 	}
 	if isEmpty(&obj.Username) {
@@ -919,13 +1008,18 @@ func postUpdateUsername(w http.ResponseWriter, r *http.Request) {
 
 	sql := fmt.Sprintf("SELECT u_id FROM users WHERE u_username = '%s'", obj.NewUsername)
 	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
 
-	if rows.Next() || err != nil {
-		httpError(w, fmt.Sprintf("There is already a user named (%s)", obj.NewUsername), http.StatusBadRequest)
+	if rows.Next() {
+		httpErrorWithCode(w, fmt.Sprintf("There is already a user named (%s)", obj.NewUsername), http.StatusBadRequest, 1)
 		return
 	}
 
-	sql = fmt.Sprintf("UPDATE users SET u_username = '%s' WHERE u_id = '%s' AND u_username = '%s' AND u_password = '%s';", obj.NewUsername, obj.Id, obj.Username, obj.Password)
+	sql = fmt.Sprintf("UPDATE users SET u_username = '%s' WHERE u_id = '%s' AND u_username = '%s' AND u_password = '%s';", obj.NewUsername, obj.ID, obj.Username, obj.Password)
 
 	res, err := database.Exec(sql)
 	if err != nil {
@@ -1181,13 +1275,14 @@ func post(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		println("HERE")
+		println(sql)
 		rows, err := database.Query(sql)
 		println("END")
 		if err != nil {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		defer rows.Close()
 
 		var posts []Post
 		for rows.Next() {
@@ -1197,7 +1292,9 @@ func post(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			posts = append(posts, post)
-			// fmt.Printf("%+v\n", post)
+			if post.IsRepost {
+				fmt.Printf("%+v\n\n\n", post)
+			}
 		}
 
 		if err = rows.Err(); err != nil {
@@ -1348,10 +1445,354 @@ func reinflateDefaultPosts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	fmt.Fprintf(w, "Successfully infalte default data (%d) with users (%d)", random+100, usersCount-1)
-	// println(database)
+}
+
+func comment(w http.ResponseWriter, r *http.Request) {
+	if err := checkRequestMethod(r, "post"); err == nil {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+		}
+		println(string(body))
+
+		var obj NewComment
+		err = json.Unmarshal(body, &obj)
+		if err != nil {
+			httpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		errorMessage := ""
+		if isEmpty(&obj.Email) {
+			errorMessage += "Missing paramter 'email'\n"
+		}
+		if isEmpty(&obj.Password) {
+			errorMessage += "Missing paramter 'password'\n"
+		}
+		if isEmpty(&obj.PostID) {
+			errorMessage += "Missing paramter 'post_id'\n"
+		}
+		if isEmpty(&obj.TextContent) {
+			errorMessage += "Missing paramter 'text_content'\n"
+		}
+		if !isEmpty(&errorMessage) {
+			httpError(w, errorMessage, http.StatusBadRequest)
+			return
+		}
+
+		database, err := getDatabase()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer database.Close()
+
+		//check user valid
+		sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s';", obj.Email, obj.Password)
+
+		rows, err := database.Query(sql)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		if !rows.Next() {
+			httpError(w, "user not found", http.StatusBadRequest)
+			return
+		}
+
+		var userID int
+		err = rows.Scan(&userID)
+		if err != nil {
+			httpError(w, "user id scan error"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//add comment
+
+		sql = fmt.Sprintf("INSERT INTO comments (c_id_user, c_id_post, c_text_content, c_datetime) VALUES ('%d','%s','%s',NOW());", userID, obj.PostID, obj.TextContent)
+
+		result, err := database.Exec(sql)
+
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		last_id, err := result.LastInsertId()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Fprintln(w, toJson(Comment{
+			ID:          fmt.Sprintf("%d", last_id),
+			UserID:      fmt.Sprintf("%d", userID),
+			PostID:      obj.PostID,
+			TextContent: obj.TextContent,
+			DateTime:    now(),
+			Upvotes:     0,
+			Downvotes:   0,
+		}))
+
+	} else if err := checkRequestMethod(r, "get"); err == nil {
+		query := r.URL.Query()
+		if checkMissingParamters(w, query, true, "id") {
+			return
+		}
+		id := query["id"][0]
+
+		database, err := getDatabase()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer database.Close()
+
+		sql := fmt.Sprintf("select * from comments where c_id = '%s'", id)
+
+		rows, err := database.Query(sql)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		if !rows.Next() {
+			httpError(w, "not comment found", http.StatusBadRequest)
+			return
+		}
+
+		var comment Comment
+		err = rows.Scan(
+			&comment.ID,
+			&comment.UserID,
+			&comment.PostID,
+			&comment.TextContent,
+			&comment.DateTime,
+			&comment.Upvotes,
+			&comment.Downvotes,
+		)
+
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Fprintln(w, toJson(comment))
+	} else {
+		httpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func getPostComments(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "post_id") {
+		return
+	}
+
+	postID := query["post_id"][0]
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("select * from comments where c_id_post = '%s'", postID)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var list []Comment
+
+	for rows.Next() {
+		var item Comment
+		err = rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.PostID,
+			&item.TextContent,
+			&item.DateTime,
+			&item.Upvotes,
+			&item.Downvotes,
+		)
+
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			continue
+		}
+		list = append(list, item)
+	}
+
+	fmt.Fprintln(w, toJson(list))
+}
+
+func postVote(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj NewVote
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		httpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	errorMessage := ""
+	if isEmpty(&obj.PostID) {
+		errorMessage += "Missing paramter 'post_id'\n"
+	}
+	if isEmpty(&obj.UserID) {
+		errorMessage += "Missing paramter 'user_id'\n"
+	}
+	if isEmpty(&obj.Email) {
+		errorMessage += "Missing paramter 'email'\n"
+	}
+	if isEmpty(&obj.Password) {
+		errorMessage += "Missing paramter 'password'\n"
+	}
+	if !isEmpty(&errorMessage) {
+		httpError(w, errorMessage, http.StatusBadRequest)
+		return
+	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	userID, err := checkUser(database, obj.Email, obj.Password)
+	if err != nil {
+		httpError(w, "During User Check "+err.Error(), http.StatusInternalServerError)
+		return
+	} else if userID == -1 {
+		httpError(w, "No Uesr Found", http.StatusBadRequest)
+		return
+	}
+
+	sql := fmt.Sprintf("CALL VotePost(%s,%s,%t,%d)", obj.UserID, obj.PostID, obj.Cancel, obj.Score)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, "During SQL : "+sql+" : "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var line string
+	rows.Scan(&line)
+
+	fmt.Fprint(w, line)
+}
+
+func repost(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj NewRepost
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		httpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	println(fmt.Sprintf("%v", obj))
+
+	errorMessage := ""
+	if isEmpty(&obj.OriginPostID) {
+		errorMessage += "Missing paramter 'origin_post_id'\n"
+	}
+	if isEmpty(&obj.PostVisibility) {
+		errorMessage += "Missing paramter 'post_visibility'\n"
+	}
+	if isEmpty(&obj.PublisherID) {
+		errorMessage += "Missing paramter 'publisher_id'\n"
+	}
+	if isEmpty(&obj.ReplyLimit) {
+		errorMessage += "Missing paramter 'reply_limit'\n"
+	}
+	if isEmpty(&obj.TextContent) {
+		errorMessage += "Missing paramter 'text_content'\n"
+	}
+	if isEmpty(&obj.Email) {
+		errorMessage += "Missing paramter 'email'\n"
+	}
+	if isEmpty(&obj.Password) {
+		errorMessage += "Missing paramter 'password'\n"
+	}
+	if !isEmpty(&errorMessage) {
+		httpError(w, errorMessage, http.StatusBadRequest)
+		return
+	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	//check user
+	sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", obj.Email, obj.Password)
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else if !rows.Next() {
+		httpError(w, "user not found", http.StatusBadRequest)
+		return
+	}
+
+	joinedTags := ""
+	println(obj.Tags)
+	if len(obj.Tags) != 0 {
+		obj.Tags = deleteEmpty(obj.Tags)
+		joinedTags = strings.Join(obj.Tags, ",")
+		sql = fmt.Sprintf("call add_tags('%s')", joinedTags)
+		_, err := database.Exec(sql)
+		if err != nil {
+			httpError(w, "add tags go wrong"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	sql = fmt.Sprintf("INSERT INTO posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visibility, p_reply, p_images_count, p_tags, p_is_repost, p_id_origin_post) VALUES ('%s',NOW(),NOW(),'%s','%s','%s',0,'%s',TRUE,'%s')", obj.PublisherID, obj.TextContent, obj.PostVisibility, obj.ReplyLimit, obj.Tags, obj.OriginPostID)
+	println(sql)
+
+	_, err = database.Exec(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 }
 
 func main() {
+	println(now())
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", getIndexHandler)                              //get
@@ -1365,6 +1806,10 @@ func main() {
 	mux.HandleFunc("/validation/email/validate", getValidateEmail)    //get
 	mux.HandleFunc("/post", post)                                     //post/get
 	mux.HandleFunc("/post/images", getPostImage)                      //get
+	mux.HandleFunc("/post/comment", comment)                          //post/get
+	mux.HandleFunc("/post/comments", getPostComments)                 //get
+	mux.HandleFunc("/post/vote", postVote)                            //post
+	mux.HandleFunc("/post/repost", repost)                            //post
 
 	mux.HandleFunc("/admin/clearunusedpostimages", clearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", reinflateDefaultPosts)

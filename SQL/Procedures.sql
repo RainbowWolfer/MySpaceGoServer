@@ -164,24 +164,66 @@ END@@
 DELIMITER ;
 
 
+SELECT * FROM posts_view;
+
 ## Start Here
 
 DROP PROCEDURE IF EXISTS GetPostsByTime;
 DELIMITER @@
 CREATE PROCEDURE GetPostsByTime(IN user_id INT,IN _offset INT,IN _length INT)
 BEGIN
-	IF user_id = 0 OR user_id = -1 THEN
-		SELECT *
-		FROM posts
+	IF user_id <= 0 THEN
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v
 		WHERE p_visibility = "all"
+		ORDER BY p_publish_date DESC
 		LIMIT _offset, _length;
-	ELSE 
-		SELECT *
-		FROM posts
-		WHERE p_visibility = "all"
+	ELSE
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v
+		WHERE p_visibility = "all" 
 		UNION
-		SELECT posts.*
-		FROM posts, users_follows
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v, users_follows
 		WHERE p_visibility = "follower" AND p_publisher_id = uf_id_target AND uf_id_follower = user_id
 		ORDER BY p_publish_date DESC
 		LIMIT _offset, _length;
@@ -190,7 +232,7 @@ END@@
 
 DELIMITER ;
 
-CALL GetPostsByTime(1,0,10);
+CALL GetPostsByTime(1,0,50);
 
 
 DROP PROCEDURE IF EXISTS GetPostsByScore;
@@ -198,18 +240,57 @@ DELIMITER @@
 CREATE PROCEDURE GetPostsByScore(IN user_id INT,IN _offset INT,IN _length INT)
 BEGIN
 	IF user_id = 0 OR user_id = -1 THEN
-		SELECT posts.*, p_upvotes - p_downvotes AS p_score
-		FROM posts
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v
 		WHERE p_visibility = "all"
 		ORDER BY p_score DESC
 		LIMIT _offset, _length;
 	ELSE
-		SELECT posts.*, p_upvotes - p_downvotes AS p_score
-		FROM posts
-		WHERE p_visibility = "all"
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v
+		WHERE p_visibility = "all" 
 		UNION
-		SELECT posts.*, p_upvotes - p_downvotes AS p_score
-		FROM posts, users_follows
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v, users_follows
 		WHERE p_visibility = "follower" AND p_publisher_id = uf_id_target AND uf_id_follower = user_id
 		ORDER BY p_score DESC
 		LIMIT _offset, _length;
@@ -227,12 +308,38 @@ BEGIN
 	IF user_id = 0 OR user_id = -1 THEN
 		SELECT 'error' AS 'error';
 	ELSE
-		SELECT posts.*
-		FROM posts, users_follows
-		WHERE p_publisher_id = uf_id_target AND uf_id_follower = user_id AND p_visibility = "all"
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v, users_follows
+		WHERE p_publisher_id = uf_id_target AND uf_id_follower = user_id AND p_visibility = "all" 
 		UNION
-		SELECT posts.*
-		FROM posts, users_follows
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v, users_follows
 		WHERE p_visibility = "follower" AND p_publisher_id = uf_id_target AND uf_id_follower = user_id
 		ORDER BY p_publish_date DESC
 		LIMIT _offset, _length;
@@ -248,18 +355,57 @@ DELIMITER @@
 CREATE PROCEDURE GetPostsByRandom(IN user_id INT,IN _offset INT,IN _length INT,IN seed INT)
 BEGIN
 	IF user_id = 0 OR user_id = -1 THEN
-		SELECT *
-		FROM posts
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v
 		WHERE p_visibility = "all"
 		ORDER BY RAND(seed)
 		LIMIT _offset, _length;
 	ELSE
-		SELECT *
-		FROM posts
-		WHERE p_visibility = "all"
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v
+		WHERE p_visibility = "all" 
 		UNION
-		SELECT posts.*
-		FROM posts, users_follows
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			CASE
+				WHEN (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id) = 0 THEN -1
+				ELSE (SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id)
+			END AS p_voted,
+			IF(v.p_is_repost = TRUE, origin_upvotes - origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE,
+				IF((SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post) = 0,
+					-1,
+					(SELECT pl_vote FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = v.p_id_origin_post)
+				),
+				NULL
+			) AS origin_voted
+		FROM posts_view v, users_follows
 		WHERE p_visibility = "follower" AND p_publisher_id = uf_id_target AND uf_id_follower = user_id
 		ORDER BY RAND(seed)
 		LIMIT _offset, _length;
@@ -268,6 +414,63 @@ END@@
 DELIMITER ;
 
 CALL GetPostsByRandom(1,0,10,10);
+
+
+
+DROP PROCEDURE IF EXISTS VotePost;
+DELIMITER @@
+CREATE PROCEDURE VotePost(IN user_id INT,IN post_id INT,IN cancel BOOL,IN score BOOL)
+BEGIN
+	IF cancel = TRUE THEN
+		DELETE FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = post_id;
+		SELECT 'delete';
+	ELSE
+		IF (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = post_id) = 0 THEN
+			INSERT INTO post_likes (pl_id_user,pl_id_post,pl_vote,pl_datetime) VALUES (user_id,post_id,score,NOW());
+			SELECT 'insert';
+		ELSE
+			UPDATE post_likes SET pl_vote = score WHERE pl_id_user = user_id AND pl_id_post = post_id;
+			SELECT 'update';
+		END IF;
+	END IF;
+END@@
+DELIMITER ;
+
+CALL VotePost(2,4,FALSE,FALSE);
+
+
+
+DROP PROCEDURE IF EXISTS CheckVote;
+DELIMITER @@
+CREATE PROCEDURE CheckVote(IN user_id INT, IN post_id INT)
+BEGIN
+	DECLARE result INT;
+	SET result = 1;
+	SELECT result;
+END@@
+DELIMITER ;
+
+CALL CheckVote(2,4);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

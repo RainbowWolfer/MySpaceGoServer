@@ -32,15 +32,15 @@ CREATE TABLE posts(
 	p_deleted BOOL NOT NULL DEFAULT FALSE, #Both
 	p_images_count INT NOT NULL DEFAULT 0, #Post
 	p_tags VARCHAR(500) NOT NULL DEFAULT '', #Post
-	p_upvotes INT NOT NULL DEFAULT 0, #Both
-	p_downvotes INT NOT NULL DEFAULT 0, #Both
-	p_repost INT NOT NULL DEFAULT 0, #Post
-	p_comments INT NOT NULL DEFAULT 0, #Both
+	#p_upvotes INT NOT NULL DEFAULT 0, #Both
+	#p_downvotes INT NOT NULL DEFAULT 0, #Both
+	#p_repost INT NOT NULL DEFAULT 0, #Post
+	#p_comments INT NOT NULL DEFAULT 0, #Both
 	p_visibility ENUM('all','follower','none') NOT NULL DEFAULT 'all', #Both
 	p_reply ENUM('all','follower','none') NOT NULL DEFAULT 'all', #Both
 	p_is_repost BOOL NOT NULL DEFAULT FALSE, #Repost
 	p_id_origin_post INT NOT NULL DEFAULT 0, #Repost
-	p_id_reposter INT NOT NULL DEFAULT 0, #Repost
+	#p_id_reposter INT NOT NULL DEFAULT 0, #Repost
 	CONSTRAINT fk_p_publisher_id FOREIGN KEY (p_publisher_id) REFERENCES users(u_id)
 );
 
@@ -71,7 +71,8 @@ CREATE TABLE post_likes(
 	pl_vote BOOL NOT NULL,
 	pl_datetime DATETIME NOT NULL,
 	CONSTRAINT fk_pl_id_user FOREIGN KEY (pl_id_user) REFERENCES users(u_id),
-	CONSTRAINT fk_pl_id_post FOREIGN KEY (pl_id_post) REFERENCES posts(p_id)
+	CONSTRAINT fk_pl_id_post FOREIGN KEY (pl_id_post) REFERENCES posts(p_id),
+	UNIQUE (pl_id_user, pl_id_post)
 );
 
 DROP TABLE IF EXISTS comment_likes;
@@ -82,7 +83,8 @@ CREATE TABLE comment_likes(
 	cl_vote BOOL NOT NULL,
 	cl_datetime DATETIME NOT NULL,
 	CONSTRAINT fk_cl_id_user FOREIGN KEY (cl_id_user) REFERENCES users(u_id),
-	CONSTRAINT fk_cl_id_comment FOREIGN KEY (cl_id_comment) REFERENCES comments(c_id)
+	CONSTRAINT fk_cl_id_comment FOREIGN KEY (cl_id_comment) REFERENCES comments(c_id),
+	UNIQUE (cl_id_user, cl_id_comment)
 );
 
 DROP TABLE IF EXISTS users_follows;
