@@ -125,8 +125,13 @@ VALUES
 
 
 
+SELECT (SELECT COUNT(p_id) FROM posts_view WHERE origin_user_id = 1 AND p_id = 213) = 1 AS p_has_reposted;
 
-
+SELECT IF(
+	(SELECT COUNT(p_id) FROM posts_view WHERE origin_user_id = 1 AND p_id = 213) = 1,
+	"YES",
+	"NO"
+) AS result;
 
 
 

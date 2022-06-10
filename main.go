@@ -140,6 +140,7 @@ type Post struct {
 	OriginReposts      int
 	Score              int
 	Voted              int //-1(undefined) 0(downvoted) 1(upvoted)
+	HasReposted        bool
 	OriginScore        *int
 	OriginVoted        *int
 }
@@ -190,6 +191,38 @@ func readUser(rows *sql.Rows) (User, error) {
 
 func readPost(rows *sql.Rows) (Post, error) {
 	var post Post
+
+	// cols, err := rows.Columns()
+	// if err != nil {
+	// 	fmt.Println("Failed to get columns", err)
+	// 	return Post{}, err
+	// }
+
+	// // Result is your slice string.
+	// rawResult := make([][]byte, len(cols))
+	// result := make([]string, len(cols))
+
+	// dest := make([]interface{}, len(cols)) // A temporary interface{} slice
+	// for i := range rawResult {
+	// 	dest[i] = &rawResult[i] // Put pointers to each string in the interface slice
+	// }
+
+	// err = rows.Scan(dest...)
+	// if err != nil {
+	// 	fmt.Println("Failed to scan row", err)
+	// 	return Post{}, err
+	// }
+
+	// for i, raw := range rawResult {
+	// 	if raw == nil {
+	// 		result[i] = "NULL"
+	// 	} else {
+	// 		result[i] = string(raw)
+	// 	}
+	// }
+
+	// println(fmt.Sprintf("%#v\n", result))
+
 	err := rows.Scan(
 		&post.ID,
 		&post.PublisherID,
@@ -232,6 +265,7 @@ func readPost(rows *sql.Rows) (Post, error) {
 		&post.OriginReposts,
 		&post.Score,
 		&post.Voted,
+		&post.HasReposted,
 		&post.OriginScore,
 		&post.OriginVoted,
 	)
@@ -1221,12 +1255,6 @@ func post(w http.ResponseWriter, r *http.Request) {
 		}
 		defer database.Close()
 
-		println(database.Stats().Idle)
-		println(database.Stats().InUse)
-
-		println(database.Stats().OpenConnections)
-		println(database.Stats().WaitDuration)
-
 		user_id := -1
 		if query.Has("email") && query.Has("password") {
 			email := query["email"][0]
@@ -1277,7 +1305,6 @@ func post(w http.ResponseWriter, r *http.Request) {
 
 		println(sql)
 		rows, err := database.Query(sql)
-		println("END")
 		if err != nil {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1292,9 +1319,9 @@ func post(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			posts = append(posts, post)
-			if post.IsRepost {
-				fmt.Printf("%+v\n\n\n", post)
-			}
+			// if post.HasReposted {
+			// 	fmt.Printf("%+v\n\n\n", post)
+			// }
 		}
 
 		if err = rows.Err(); err != nil {
