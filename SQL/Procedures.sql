@@ -302,14 +302,14 @@ CALL GetPostsByRandom(1,0,10,10);
 
 DROP PROCEDURE IF EXISTS VotePost;
 DELIMITER @@
-CREATE PROCEDURE VotePost(IN user_id INT,IN post_id INT,IN cancel BOOL,IN score BOOL)
+CREATE PROCEDURE VotePost(IN user_id INT, IN post_id INT, IN cancel BOOL, IN score BOOL)
 BEGIN
 	IF cancel = TRUE THEN
 		DELETE FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = post_id;
 		SELECT 'delete';
 	ELSE
 		IF (SELECT COUNT(pl_id) FROM post_likes WHERE pl_id_user = user_id AND pl_id_post = post_id) = 0 THEN
-			INSERT INTO post_likes (pl_id_user,pl_id_post,pl_vote,pl_datetime) VALUES (user_id,post_id,score,NOW());
+			INSERT INTO post_likes (pl_id_user, pl_id_post, pl_vote, pl_datetime) VALUES (user_id,post_id,score,NOW());
 			SELECT 'insert';
 		ELSE
 			UPDATE post_likes SET pl_vote = score WHERE pl_id_user = user_id AND pl_id_post = post_id;
@@ -319,7 +319,136 @@ BEGIN
 END@@
 DELIMITER ;
 
-CALL VotePost(2,4,FALSE,FALSE);
+CALL VotePost(2, 4, FALSE, FALSE);
+
+
+DROP PROCEDURE IF EXISTS VoteComment;
+DELIMITER @@
+CREATE PROCEDURE VoteComment(IN user_id INT, IN comment_id INT, IN cancel BOOL, IN score BOOL)
+BEGIN
+	IF cancel = TRUE THEN	
+	DELETE FROM comment_likes WHERE cl_id_user = user_id AND cl_id_comment = comment_id;
+		SELECT 'delete';
+	ELSE
+		IF (SELECT COUNT(cl_id) FROM comment_likes WHERE cl_id_user = user_id AND cl_id_comment = comment_id) = 0 THEN
+			INSERT INTO comment_likes (cl_id_user, cl_id_comment, cl_vote, cl_datetime) VALUES (user_id, comment_id, score, NOW());
+			SELECT 'insert';
+		ELSE
+			UPDATE comment_likes SET cl_vote = score WHERE cl_id_user = user_id AND cl_id_comment = comment_id;
+			SELECT 'update';
+		END IF;
+	END IF;
+END @@
+
+DELIMITER ;
+
+CALL VoteComment(2, 4, FALSE, FALSE);
+
+
+
+
+DROP PROCEDURE IF EXISTS GetCommentsByTime;
+DELIMITER @@
+CREATE PROCEDURE GetCommentsByTime(IN user_id INT, IN post_id INT, IN _offset INT, IN _length INT)
+BEGIN
+	SELECT v.*,
+		CASE
+			WHEN user_id <= 0 THEN -1
+			WHEN (SELECT COUNT(cl_id) FROM comment_likes WHERE cl_id_user = user_id AND cl_id_comment = c_id) = 0 THEN -1
+			ELSE (SELECT cl_vote FROM comment_likes WHERE cl_id_user = user_id AND cl_id_comment = c_id)
+		END AS c_voted
+	FROM comments_view v
+	WHERE v.c_id_post = post_id
+	ORDER BY c_datetime DESC
+	LIMIT _offset,_length;
+END @@
+DELIMITER ;
+
+CALL GetCommentsByTime(1, 228, 0, s50);
+
+
+
+DROP PROCEDURE IF EXISTS GetRepostRecords;
+DELIMITER @@
+CREATE PROCEDURE GetRepostRecords(IN post_id INT, IN _offset INT, IN _length INT)
+BEGIN
+	SELECT
+		p_id,
+		p_publisher_id,
+		u_username,
+		p_publish_date,
+		p_text_content
+	FROM posts_view
+	WHERE p_id_origin_post = post_id;
+END @@
+DELIMITER ;
+
+CALL GetRepostRecords(220, 0, 50);
+
+
+
+DROP PROCEDURE IF EXISTS GetScoreRecords;
+DELIMITER @@
+CREATE PROCEDURE GetScoreRecords(IN post_id INT, IN _offset INT, IN _length INT)
+BEGIN
+	SELECT
+		pl_id,
+		pl_id_user,
+		u_username,
+		pl_datetime,
+		pl_vote
+	FROM post_likes
+	LEFT JOIN users ON pl_id_user = u_id
+	WHERE pl_id_post = post_id;
+END @@
+DELIMITER ;
+
+CALL GetScoreRecords(229, 0, 50);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

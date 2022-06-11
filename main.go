@@ -151,17 +151,46 @@ type Comment struct {
 	PostID      string
 	TextContent string
 	DateTime    string
+	Username    string
+	Email       string
+	Profile     string
 	Upvotes     int
 	Downvotes   int
+	Voted       int
 }
 
-type NewVote struct {
+type RepostRecord struct {
+	PostID   string `json:"post_id"`
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Time     string `json:"time"`
+	Quote    string `json:"quote"`
+}
+
+type ScoreRecord struct {
+	LikeID   string `json:"like_id"`
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Time     string `json:"time"`
+	Vote     int    `json:"vote"`
+}
+
+type NewPostVote struct {
 	PostID   string `json:"post_id"`
 	UserID   string `json:"user_id"`
 	Cancel   bool   `json:"cancel"`
 	Score    int    `json:"score"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type NewCommentVote struct {
+	CommentID string `json:"comment_id"`
+	UserID    string `json:"user_id"`
+	Cancel    bool   `json:"cancel"`
+	Score     int    `json:"score"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
 }
 
 type NewRepost struct {
@@ -1515,7 +1544,7 @@ func comment(w http.ResponseWriter, r *http.Request) {
 		defer database.Close()
 
 		//check user valid
-		sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s';", obj.Email, obj.Password)
+		sql := fmt.Sprintf("select u_id, u_username, u_email, u_profileDescription from users where u_email = '%s' and u_password = '%s';", obj.Email, obj.Password)
 
 		rows, err := database.Query(sql)
 		if err != nil {
@@ -1528,17 +1557,20 @@ func comment(w http.ResponseWriter, r *http.Request) {
 			httpError(w, "user not found", http.StatusBadRequest)
 			return
 		}
-
-		var userID int
-		err = rows.Scan(&userID)
+		var user struct {
+			UserID   int
+			Username string
+			Email    string
+			Profile  string
+		}
+		err = rows.Scan(&user.UserID, &user.Username, &user.Email, &user.Profile)
 		if err != nil {
 			httpError(w, "user id scan error"+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		//add comment
-
-		sql = fmt.Sprintf("INSERT INTO comments (c_id_user, c_id_post, c_text_content, c_datetime) VALUES ('%d','%s','%s',NOW());", userID, obj.PostID, obj.TextContent)
+		sql = fmt.Sprintf("INSERT INTO comments (c_id_user, c_id_post, c_text_content, c_datetime) VALUES ('%d','%s','%s',NOW());", user.UserID, obj.PostID, obj.TextContent)
 
 		result, err := database.Exec(sql)
 
@@ -1553,12 +1585,17 @@ func comment(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		//actually, i can just read it from database
 		fmt.Fprintln(w, toJson(Comment{
 			ID:          fmt.Sprintf("%d", last_id),
-			UserID:      fmt.Sprintf("%d", userID),
+			UserID:      fmt.Sprintf("%d", user.UserID),
 			PostID:      obj.PostID,
 			TextContent: obj.TextContent,
 			DateTime:    now(),
+			Username:    user.Username,
+			Email:       user.Email,
+			Profile:     user.Profile,
+			Voted:       -1,
 			Upvotes:     0,
 			Downvotes:   0,
 		}))
@@ -1618,11 +1655,12 @@ func getPostComments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := r.URL.Query()
-	if checkMissingParamters(w, query, true, "post_id") {
+	if checkMissingParamters(w, query, true, "post_id", "offset") {
 		return
 	}
 
 	postID := query["post_id"][0]
+	offset := query["offset"][0]
 
 	database, err := getDatabase()
 	if err != nil {
@@ -1631,7 +1669,40 @@ func getPostComments(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	sql := fmt.Sprintf("select * from comments where c_id_post = '%s'", postID)
+	limit := 15
+	if query.Has("limit") {
+		limit, err = strconv.Atoi(query["limit"][0])
+		if err != nil {
+			httpError(w, "limit is not a valid number"+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	user_id := -1
+	if query.Has("email") && query.Has("password") {
+		email := query["email"][0]
+		password := query["password"][0]
+		if !isEmpty(&email) && !isEmpty(&password) {
+			sql_user := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", email, password)
+			rows, err := database.Query(sql_user)
+			if err != nil {
+				httpError(w, "query user error"+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+			if !rows.Next() {
+				httpError(w, "Cannot find user", http.StatusBadRequest)
+				return
+			}
+
+			if err = rows.Scan(&user_id); err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	sql := fmt.Sprintf("call GetCommentsByTime(%d,'%s','%s',%d);", user_id, postID, offset, limit)
 
 	rows, err := database.Query(sql)
 	if err != nil {
@@ -1650,8 +1721,12 @@ func getPostComments(w http.ResponseWriter, r *http.Request) {
 			&item.PostID,
 			&item.TextContent,
 			&item.DateTime,
+			&item.Username,
+			&item.Email,
+			&item.Profile,
 			&item.Upvotes,
 			&item.Downvotes,
+			&item.Voted,
 		)
 
 		if err != nil {
@@ -1674,7 +1749,7 @@ func postVote(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
 
-	var obj NewVote
+	var obj NewPostVote
 	err = json.Unmarshal(body, &obj)
 	if err != nil {
 		httpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
@@ -1818,6 +1893,182 @@ func repost(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func postCommentVote(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj NewCommentVote
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		httpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	errorMessage := ""
+	if isEmpty(&obj.CommentID) {
+		errorMessage += "Missing paramter 'email'\n"
+	}
+	if isEmpty(&obj.UserID) {
+		errorMessage += "Missing paramter 'email'\n"
+	}
+	if isEmpty(&obj.Email) {
+		errorMessage += "Missing paramter 'email'\n"
+	}
+	if isEmpty(&obj.Password) {
+		errorMessage += "Missing paramter 'password'\n"
+	}
+	if !isEmpty(&errorMessage) {
+		httpError(w, errorMessage, http.StatusBadRequest)
+		return
+	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	userID, err := checkUser(database, obj.Email, obj.Password)
+	if err != nil {
+		httpError(w, "During User Check "+err.Error(), http.StatusInternalServerError)
+		return
+	} else if userID == -1 {
+		httpError(w, "No Uesr Found", http.StatusBadRequest)
+		return
+	}
+
+	sql := fmt.Sprintf("CALL VoteComment(%d, '%s', %t, %d);", userID, obj.CommentID, obj.Cancel, obj.Score)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var line string
+	rows.Scan(&line)
+
+	fmt.Fprint(w, line)
+}
+
+func getRepostRecords(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "post_id", "offset") {
+		return
+	}
+
+	var err error
+
+	postID := query["post_id"][0]
+	offset := query["offset"][0]
+
+	limit := 15
+	if query.Has("limit") {
+		limit, err = strconv.Atoi(query["limit"][0])
+		if err != nil {
+			httpError(w, "limit is not a valid number"+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("CALL GetRepostRecords('%s', '%s', %d);", postID, offset, limit)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var records []RepostRecord
+	for rows.Next() {
+		var record RepostRecord
+		err = rows.Scan(&record.PostID, &record.UserID, &record.Username, &record.Time, &record.Quote)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		records = append(records, record)
+	}
+
+	fmt.Fprint(w, toJson(records))
+}
+
+func getScoreRecords(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "post_id", "offset") {
+		return
+	}
+
+	var err error
+
+	postID := query["post_id"][0]
+	offset := query["offset"][0]
+
+	limit := 15
+	if query.Has("limit") {
+		limit, err = strconv.Atoi(query["limit"][0])
+		if err != nil {
+			httpError(w, "limit is not a valid number"+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("CALL GetScoreRecords('%s', '%s', %d);", postID, offset, limit)
+
+	println(sql)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var records []ScoreRecord
+	for rows.Next() {
+		var record ScoreRecord
+		err = rows.Scan(&record.LikeID, &record.UserID, &record.Username, &record.Time, &record.Vote)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		records = append(records, record)
+	}
+
+	fmt.Fprint(w, toJson(records))
+}
+
 func main() {
 	println(now())
 	mux := http.NewServeMux()
@@ -1834,9 +2085,12 @@ func main() {
 	mux.HandleFunc("/post", post)                                     //post/get
 	mux.HandleFunc("/post/images", getPostImage)                      //get
 	mux.HandleFunc("/post/comment", comment)                          //post/get
+	mux.HandleFunc("/post/comment/vote", postCommentVote)             //get
 	mux.HandleFunc("/post/comments", getPostComments)                 //get
 	mux.HandleFunc("/post/vote", postVote)                            //post
 	mux.HandleFunc("/post/repost", repost)                            //post
+	mux.HandleFunc("/post/repostRecords", getRepostRecords)           //get
+	mux.HandleFunc("/post/scoreRecords", getScoreRecords)             //get
 
 	mux.HandleFunc("/admin/clearunusedpostimages", clearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", reinflateDefaultPosts)

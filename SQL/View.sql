@@ -72,7 +72,19 @@ LIMIT 0, 1000;
 
 
 
+DROP VIEW IF EXISTS comments_view;
+CREATE VIEW comments_view AS
+SELECT
+	a.*,	
+	u.u_username,
+	u.u_email,
+	u.u_profileDescription AS u_profile,
+	(SELECT COUNT(cl_id) FROM comment_likes WHERE cl_id_comment = a.c_id AND cl_vote = 1) AS c_upvotes, 
+	(SELECT COUNT(cl_id) FROM comment_likes WHERE cl_id_comment = a.c_id AND cl_vote = 0) AS c_downvotes
+FROM comments a
+LEFT JOIN users u ON u.u_id = a.c_id_user;
 
+SELECT * FROM comments_view;
 
 
 

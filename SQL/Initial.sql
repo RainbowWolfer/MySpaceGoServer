@@ -50,9 +50,9 @@ CREATE TABLE comments(
 	c_id_user INT NOT NULL,
 	c_id_post INT NOT NULL,
 	c_text_content TEXT NOT NULL,
-	c_datetime DATETIME NOT NULL,
-	c_upvotes INT NOT NULL DEFAULT 0,
-	c_downvote INT NOT NULL DEFAULT 0,
+	c_datetime DATETIME NOT NULL DEFAULT(NOW()),
+	#c_upvotes INT NOT NULL DEFAULT 0,
+	#c_downvote INT NOT NULL DEFAULT 0,
 	CONSTRAINT fk_c_id_uesr FOREIGN KEY (c_id_user) REFERENCES users(u_id),
 	CONSTRAINT fk_c_id_post FOREIGN KEY (c_id_post) REFERENCES posts(p_id)
 );
