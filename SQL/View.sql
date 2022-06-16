@@ -88,6 +88,31 @@ SELECT * FROM comments_view;
 
 
 
+#message type to be completed
+DROP VIEW IF EXISTS collections_view;
+CREATE VIEW collections_view AS
+SELECT
+	a.uc_id,
+	a.uc_id_user,
+	a.uc_id_target,
+	a.uc_type,
+	a.uc_time,
+	p.p_publisher_id,
+	u.u_username,
+	p.p_text_content,
+	p.p_images_count,
+	p.p_is_repost
+FROM user_collections a
+LEFT JOIN posts p ON uc_type = 'POST' AND a.uc_id_target = p.p_id
+LEFT JOIN users u ON p.p_publisher_id = u.u_id;
+
+
+
+SELECT * FROM collections_view;
+
+
+SELECT * FROM collections_view WHERE uc_id_user = 1 LIMIT 0,15;
+
 
 
 

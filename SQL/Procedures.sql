@@ -299,6 +299,31 @@ DELIMITER ;
 CALL GetPostsByRandom(1,0,10,10);
 
 
+DROP PROCEDURE IF EXISTS GetPostByID;
+DELIMITER @@
+CREATE PROCEDURE GetPostByID(IN post_id INT, IN _email VARCHAR(40), IN _password VARCHAR(40))
+BEGIN
+	DECLARE user_id INT;
+	SET user_id = (SELECT u_id FROM users WHERE u_email = _email AND u_password = _password);
+	#select user_id, user_id <=> NULL;
+	IF user_id <=> NULL THEN
+		SELECT 'user not found';
+	ELSE
+		SELECT v.*,
+			p_upvotes - p_downvotes AS p_score,
+			HasVoted(user_id, v.p_id) AS p_voted,
+			(SELECT COUNT(c.p_id) FROM posts_view c WHERE c.origin_user_id = user_id AND c.p_id = v.p_id) >= 1 OR 
+			(SELECT COUNT(c.p_id_origin_post) FROM posts_view c WHERE c.origin_user_id = 1 AND c.p_id_origin_post = v.p_id) >= 1 AS p_has_reposted,
+			IF(v.p_is_repost = TRUE, v.origin_upvotes - v.origin_downvotes, NULL) AS origin_score,
+			IF(v.p_is_repost = TRUE, HasVoted(user_id,v.p_id_origin_post), NULL) AS origin_voted
+		FROM posts_view v
+		WHERE p_id = post_id;
+	END IF;
+END @@
+DELIMITER ;
+
+CALL GetPostByID(1,'2@test.com','123456');
+
 
 DROP PROCEDURE IF EXISTS VotePost;
 DELIMITER @@
@@ -407,10 +432,51 @@ CALL GetScoreRecords(229, 0, 50);
 
 
 
+DROP PROCEDURE IF EXISTS GetUserByID;
+DELIMITER @@
+CREATE PROCEDURE GetUserByID(IN user_id INT, IN self_id INT)
+BEGIN
+	SELECT 
+		u.*,
+		IF(IFNULL(uf_id, 0) = 0, 0, 1) AS u_is_following
+	FROM users u
+	LEFT JOIN users_follows uf ON uf_id_target = user_id AND uf_id_follower = self_id
+	WHERE u_id = user_id;
+END @@
+DELIMITER ;
+
+CALL GetUserByID(3,1);
 
 
+DROP PROCEDURE IF EXISTS GetUserByUsername;
+DELIMITER @@
+CREATE PROCEDURE GetUserByUsername(IN username VARCHAR(40), IN self_id INT)
+BEGIN
+	SELECT 
+		u.*,
+		IF(IFNULL(uf_id, 0) = 0, 0, 1) AS u_is_following
+	FROM users u
+	LEFT JOIN users_follows uf ON uf_id_target = u_id AND uf_id_follower = self_id
+	WHERE u_username = username;
+END @@
+DELIMITER ;
+
+CALL GetUserByUsername('mySpaceOfficial',2);
 
 
+DROP PROCEDURE IF EXISTS GetUserByLogin;
+DELIMITER @@
+CREATE PROCEDURE GetUserByLogin(IN _email VARCHAR(40), IN _password VARCHAR(40))
+BEGIN
+	SELECT 
+		u.*,
+		FALSE AS u_is_following
+	FROM users u
+	WHERE u_email = _email AND u_password = _password;
+END @@
+DELIMITER ;
+
+CALL GetUserByLogin('2@test2.com','123456');
 
 
 

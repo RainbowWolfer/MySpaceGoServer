@@ -99,6 +99,17 @@ CREATE TABLE users_follows(
 	CHECK (uf_id_follower <> uf_id_target)
 );
 
+DROP TABLE IF EXISTS user_collections;
+CREATE TABLE user_collections(
+	uc_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	uc_id_user INT NOT NULL,
+	uc_id_target INT NOT NULL, #postID or messageID
+	uc_type ENUM('POST','MESSAGE') NOT NULL,
+	uc_time DATETIME NOT NULL DEFAULT(NOW()),
+	FOREIGN KEY (uc_id_user) REFERENCES users(u_id),
+	UNIQUE(uc_id_user, uc_id_target)
+);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 

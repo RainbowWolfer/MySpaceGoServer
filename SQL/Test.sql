@@ -120,11 +120,6 @@ VALUES
 
 
 
-
-
-
-
-
 SELECT (SELECT COUNT(p_id) FROM posts_view WHERE origin_user_id = 1 AND p_id = 213) = 1 AS p_has_reposted;
 
 SELECT IF(
@@ -134,9 +129,22 @@ SELECT IF(
 ) AS result;
 
 
+INSERT INTO user_collections(uc_id_user, uc_id_target, uc_type) VALUES ();
 
 
 
+
+
+SELECT * FROM user_collections WHERE uc_id_user = ;
+
+
+DELETE FROM user_collections WHERE uc_id_target = 1 AND uc_id_user = 1;	
+
+
+
+INSERT INTO users_follows (uf_id_follower, uf_id_target) VALUES ();
+
+DELETE FROM users_follows WHERE uf_id_follower = , uf_id_target = ;
 
 
 
