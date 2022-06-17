@@ -418,6 +418,7 @@ func checkUser(db *sql.DB, email string, pasword string) (int, error) {
 	if err != nil {
 		return -1, err
 	}
+	defer rows.Close()
 	if !rows.Next() {
 		return -1, nil
 	}
@@ -1343,22 +1344,27 @@ func post(w http.ResponseWriter, r *http.Request) {
 			email := query["email"][0]
 			password := query["password"][0]
 			if !isEmpty(&email) && !isEmpty(&password) {
-				sql_user := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", email, password)
-				rows, err := database.Query(sql_user)
+				_user_id, err := checkUser(database, email, password)
 				if err != nil {
-					httpError(w, "query user error"+err.Error(), http.StatusInternalServerError)
-					return
+					httpError(w, err.Error(), http.StatusBadRequest)
 				}
-				defer rows.Close()
-				if !rows.Next() {
-					httpError(w, "Cannot find user", http.StatusBadRequest)
-					return
-				}
+				user_id = _user_id
+				// sql_user := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s'", email, password)
+				// rows, err := database.Query(sql_user)
+				// if err != nil {
+				// 	httpError(w, "query user error"+err.Error(), http.StatusInternalServerError)
+				// 	return
+				// }
+				// defer rows.Close()
+				// if !rows.Next() {
+				// 	httpError(w, "Cannot find user", http.StatusBadRequest)
+				// 	return
+				// }
 
-				if err = rows.Scan(&user_id); err != nil {
-					httpError(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
+				// if err = rows.Scan(&user_id); err != nil {
+				// 	httpError(w, err.Error(), http.StatusInternalServerError)
+				// 	return
+				// }
 			}
 		}
 
@@ -1918,7 +1924,9 @@ func repost(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
-	} else if !rows.Next() {
+	}
+	defer rows.Close()
+	if !rows.Next() {
 		httpError(w, "user not found", http.StatusBadRequest)
 		return
 	}
@@ -2436,33 +2444,184 @@ func postUserFollow(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Success")
 }
 
+func getUserByUserID(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "email", "password", "target_id", "offset", "limit") {
+		return
+	}
+
+	email := query["email"][0]
+	password := query["password"][0]
+	target_id := query["target_id"][0]
+	offset := query["offset"][0]
+	limit := query["limit"][0]
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	user_id := -1
+	if !isEmpty(&email) && !isEmpty(&password) {
+		_user_id, err := checkUser(database, email, password)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusBadRequest)
+		}
+		user_id = _user_id
+	}
+
+	sql := fmt.Sprintf("CALL GetPostsByTargetID(%d,%s,%s,%s);", user_id, target_id, offset, limit)
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var list []Post
+	for rows.Next() {
+		item, err := readPost(rows)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		list = append(list, item)
+	}
+
+	fmt.Fprint(w, toJson(list))
+}
+
+func getPostsAndFollowersCount(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "user_id") {
+		return
+	}
+
+	user_id := query["user_id"][0]
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("CALL GetUserPostAndFollowersCount(%s);", user_id)
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		httpError(w, "no row", http.StatusInternalServerError)
+		return
+	}
+
+	var postsCount int
+	var followersCount int
+	err = rows.Scan(&postsCount, &followersCount)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, toJson([]int{postsCount, followersCount}))
+}
+
+func getUserFollowers(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if checkMissingParamters(w, query, true, "user_id") {
+		return
+	}
+
+	user_id := query["user_id"][0]
+	self_id := -1
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	if query.Has("email") && query.Has("password") {
+		email := query["email"][0]
+		password := query["password"][0]
+		if !isEmpty(&email) && !isEmpty(&password) {
+			_id, err := checkUser(database, email, password)
+			if err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			self_id = _id
+		}
+	}
+
+	sql := fmt.Sprintf("CALL GetUserFollowers(%s,%d)", user_id, self_id)
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var list []User
+
+	for rows.Next() {
+		item, err := readUser(rows)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		list = append(list, item)
+	}
+
+	fmt.Fprint(w, toJson(list))
+}
+
 func main() {
 	println(now())
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", getIndexHandler)                              //get
-	mux.HandleFunc("/user", getUser)                                  //get
-	mux.HandleFunc("/user/checkExisting", getCheckUserExist)          //get
-	mux.HandleFunc("/user/avatar", getAvatar)                         //get
-	mux.HandleFunc("/user/update/username", postUpdateUsername)       //post
-	mux.HandleFunc("/user/follow", postUserFollow)                    //post
-	mux.HandleFunc("/login", getTryLogin)                             //get
-	mux.HandleFunc("/upload/avatar", postUploadAvatar)                //post
-	mux.HandleFunc("/validation/email/send", postSendValidationEmail) //post
-	mux.HandleFunc("/validation/email/validate", getValidateEmail)    //get
-	mux.HandleFunc("/post", post)                                     //post/get
-	mux.HandleFunc("/post/id", getPostByID)                           //get
-	mux.HandleFunc("/post/images", getPostImage)                      //get
-	mux.HandleFunc("/post/comment", comment)                          //post/get
-	mux.HandleFunc("/post/comment/vote", postCommentVote)             //get
-	mux.HandleFunc("/post/comments", getPostComments)                 //get
-	mux.HandleFunc("/post/vote", postVote)                            //post
-	mux.HandleFunc("/post/repost", repost)                            //post
-	mux.HandleFunc("/post/repostRecords", getRepostRecords)           //get
-	mux.HandleFunc("/post/scoreRecords", getScoreRecords)             //get
-	mux.HandleFunc("/collections/add", postAddCollection)             //post
-	mux.HandleFunc("/collections/remove", postDeleteCollection)       //post
-	mux.HandleFunc("/collections", getCollections)                    //get
+	mux.HandleFunc("/", getIndexHandler)                                      //get
+	mux.HandleFunc("/user", getUser)                                          //get
+	mux.HandleFunc("/user/checkExisting", getCheckUserExist)                  //get
+	mux.HandleFunc("/user/avatar", getAvatar)                                 //get
+	mux.HandleFunc("/user/update/username", postUpdateUsername)               //post
+	mux.HandleFunc("/user/follow", postUserFollow)                            //post
+	mux.HandleFunc("/user/getFollowers", getUserFollowers)                    //get
+	mux.HandleFunc("/user/postsAndFollowersCount", getPostsAndFollowersCount) //get
+	mux.HandleFunc("/login", getTryLogin)                                     //get
+	mux.HandleFunc("/upload/avatar", postUploadAvatar)                        //post
+	mux.HandleFunc("/validation/email/send", postSendValidationEmail)         //post
+	mux.HandleFunc("/validation/email/validate", getValidateEmail)            //get
+	mux.HandleFunc("/post", post)                                             //post/get
+	mux.HandleFunc("/post/user", getUserByUserID)                             //get
+	mux.HandleFunc("/post/id", getPostByID)                                   //get
+	mux.HandleFunc("/post/images", getPostImage)                              //get
+	mux.HandleFunc("/post/comment", comment)                                  //post/get
+	mux.HandleFunc("/post/comment/vote", postCommentVote)                     //get
+	mux.HandleFunc("/post/comments", getPostComments)                         //get
+	mux.HandleFunc("/post/vote", postVote)                                    //post
+	mux.HandleFunc("/post/repost", repost)                                    //post
+	mux.HandleFunc("/post/repostRecords", getRepostRecords)                   //get
+	mux.HandleFunc("/post/scoreRecords", getScoreRecords)                     //get
+	mux.HandleFunc("/collections/add", postAddCollection)                     //post
+	mux.HandleFunc("/collections/remove", postDeleteCollection)               //post
+	mux.HandleFunc("/collections", getCollections)                            //get
 
 	mux.HandleFunc("/admin/clearunusedpostimages", clearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", reinflateDefaultPosts)
