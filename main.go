@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "context"
 	"crypto/md5"
+	_ "crypto/tls"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -24,6 +25,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	_ "gopkg.in/gomail.v2"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -941,17 +944,28 @@ func postSendValidationEmail(w http.ResponseWriter, r *http.Request) {
 		Link: url,
 	})
 
-	from := "rainbowwolfer@outlook.com"
-	password := "Windows15best"
+	from := "1519787190@qq.com"
+	password := "awowxbgooevfgbjc"
 
-	smtpHost := "smtp.office365.com"
+	smtpHost := "smtp.qq.com"
 	smtpPort := "587"
+
+	// m := gomail.NewMessage()
+	// m.SetHeader(`From`, from)
+	// m.SetHeader(`From`, email_query)
+	// m.SetHeader(`Subject`, body.String())
+	// d := gomail.NewDialer(smtpHost, 587, from, password)
+	// d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	// if err := d.DialAndSend(m); err != nil {
+	// 	httpError(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	auth := LoginAuth(from, password)
 
 	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, body.Bytes())
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, "sending email failed : "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
