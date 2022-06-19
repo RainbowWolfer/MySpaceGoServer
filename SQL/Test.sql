@@ -150,5 +150,7 @@ DELETE FROM users_follows WHERE uf_id_follower = , uf_id_target = ;
 
 
 
+CALL GetPostsByTime(1,0,5);
+
 
 

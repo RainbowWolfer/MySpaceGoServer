@@ -1,12 +1,12 @@
+DROP TRIGGER IF EXISTS before_post_delete;
 DELIMITER $$
-
-CREATE TRIGGER after_posts_view_delete
-AFTER DELETE
-ON record_posts_views FOR EACH ROW
+CREATE TRIGGER before_post_delete
+BEFORE DELETE
+ON posts FOR EACH ROW
 BEGIN
-	CALL DeletePostView(old.rpv_name_posts_view);
-END$$   
+	#delete all comments
+	DELETE FROM comments WHERE c_id_post = old.p_id;
+	#delete all votes
+	DELETE FROM post_likes WHERE pl_id_post = old.p_id;
+END$$
 DELIMITER ;
-
-
-SET @@log_bin_trust_function_creators =1

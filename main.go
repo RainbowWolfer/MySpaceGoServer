@@ -238,6 +238,12 @@ type RemoveCollection struct {
 	Password string `json:"password"`
 }
 
+type DeletePost struct {
+	PostID   string `json:"post_id"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 func readUser(rows *sql.Rows) (User, error) {
 	var user User
 	if err := rows.Scan(
@@ -2435,6 +2441,7 @@ func postUserFollow(w http.ResponseWriter, r *http.Request) {
 		sql = fmt.Sprintf("insert into users_follows (uf_id_follower, uf_id_target) values (%d,%s);", user_id, obj.TargetID)
 	}
 
+	println(sql)
 	_, err = database.Exec(sql)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -2592,6 +2599,82 @@ func getUserFollowers(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, toJson(list))
 }
 
+func postDelete(w http.ResponseWriter, r *http.Request) {
+	if checkRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj DeletePost
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		httpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	errorMessage := ""
+	if isEmpty(&obj.Email) {
+		errorMessage += "Missing paramter 'email'\n"
+	}
+	if isEmpty(&obj.Password) {
+		errorMessage += "Missing paramter 'password'\n"
+	}
+	if isEmpty(&obj.PostID) {
+		errorMessage += "Missing paramter 'post_id'\n"
+	}
+	if !isEmpty(&errorMessage) {
+		httpError(w, errorMessage, http.StatusBadRequest)
+		return
+	}
+
+	database, err := getDatabase()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	user_id, err := checkUser(database, obj.Email, obj.Password)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sql := fmt.Sprintf("select p_publisher_id from posts where p_id = %s;", obj.PostID)
+	rows, err := database.Query(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		httpError(w, "No Post Found", http.StatusBadRequest)
+		return
+	}
+
+	var publisher_id int
+	rows.Scan(&publisher_id)
+
+	if user_id != publisher_id {
+		httpError(w, "You cannot delete post other than yourself's", http.StatusBadRequest)
+		return
+	}
+
+	sql = fmt.Sprintf("CALL DeletePost(%s);", obj.PostID)
+	_, err = database.Exec(sql)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "success")
+}
+
 func main() {
 	println(now())
 	mux := http.NewServeMux()
@@ -2609,6 +2692,7 @@ func main() {
 	mux.HandleFunc("/validation/email/send", postSendValidationEmail)         //post
 	mux.HandleFunc("/validation/email/validate", getValidateEmail)            //get
 	mux.HandleFunc("/post", post)                                             //post/get
+	mux.HandleFunc("/post/delete", postDelete)                                //post
 	mux.HandleFunc("/post/user", getUserByUserID)                             //get
 	mux.HandleFunc("/post/id", getPostByID)                                   //get
 	mux.HandleFunc("/post/images", getPostImage)                              //get

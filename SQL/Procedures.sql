@@ -225,7 +225,7 @@ BEGIN
 		IF(v.p_is_repost = TRUE, HasVoted(user_id,v.p_id_origin_post), NULL) AS origin_voted
 	FROM posts_view v, users_follows
 	WHERE p_visibility = "follower" AND p_publisher_id = uf_id_target AND uf_id_follower = user_id
-	ORDER BY p_upvotes DESC
+	ORDER BY p_upvotes DESC, p_downvotes, p_reposts DESC
 	LIMIT _offset, _length;
 END@@
 DELIMITER ;
@@ -545,7 +545,21 @@ DELIMITER ;
 CALL GetUserFollowers(1, -1);
 
 
+DROP PROCEDURE IF EXISTS DeletePost;
+DELIMITER @@
+CREATE PROCEDURE DeletePost(IN post_id INT)
+BEGIN
+	# (trigger 'before_post_delete' handles stuff before deleting)
+	# delete all reposts
+	DELETE FROM posts WHERE p_id_origin_post = post_id;
+	# delete post
+	DELETE FROM posts WHERE p_id = post_id;
+END @@ 
+DELIMITER ;
 
+CALL DeletePost(1);
+
+SELECT p_publisher_id FROM posts WHERE p_id = 222;
 
 
 
