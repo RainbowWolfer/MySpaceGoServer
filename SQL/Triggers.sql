@@ -10,3 +10,14 @@ BEGIN
 	DELETE FROM post_likes WHERE pl_id_post = old.p_id;
 END$$
 DELIMITER ;
+
+DROP TRIGGER IF EXISTS before_comment_delete;
+DELIMITER $$
+CREATE TRIGGER before_comment_delete
+BEFORE DELETE
+ON comments FOR EACH ROW
+BEGIN
+	#delete all comments votes
+	DELETE FROM comment_likes WHERE cl_id_comment = old.c_id;
+END$$
+DELIMITER ;
