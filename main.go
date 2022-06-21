@@ -2080,8 +2080,8 @@ func main() {
 	mux.HandleFunc("/login", tryLogin_get)              //get
 	mux.HandleFunc("/upload/avatar", uploadAvatar_post) //post
 
-	mux.HandleFunc("/validation/email/send", sendValidationEmail_post) //post
-	mux.HandleFunc("/validation/email/validate", validateEmail_get)    //get
+	mux.HandleFunc("validation", sendValidationEmail_post)          //post
+	mux.HandleFunc("/validation/email/validate", validateEmail_get) //get
 
 	mux.HandleFunc("/post", post_post_get)                      //post/get
 	mux.HandleFunc("/post/delete", deletePost_post)             //post

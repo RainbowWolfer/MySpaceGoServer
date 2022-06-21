@@ -3,6 +3,7 @@ package validation
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
@@ -12,22 +13,20 @@ import (
 	"rainbowwolfer/myspacegoserver/api"
 	"rainbowwolfer/myspacegoserver/goGin/config"
 	"rainbowwolfer/myspacegoserver/goGin/ginTools"
-	"rainbowwolfer/myspacegoserver/goGin/route/post"
-	"text/template"
 )
 
 func ValidationHandler() (string, ginTools.RouteMap) {
 	routeMap := ginTools.NewRouteMap()
 
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/mail/send",
+		Name:   "/",
 		Fun:    sendValidationEmail_post,
 		Method: http.MethodPost,
 	})
 	routeMap.AddRoute(ginTools.Route{
 		Name:   "/email/validate",
 		Fun:    validateEmail_get,
-		Method: http.MethodPost,
+		Method: http.MethodGet,
 	})
 
 	// 可以读取url中的参数
@@ -121,7 +120,7 @@ func sendValidationEmail_post(context *gin.Context) {
 
 	to := []string{email_query}
 
-	t, _ := template.ParseFiles("email_validation.html")
+	//t, _ := template.ParseFiles("email_validation.html")
 	var body bytes.Buffer
 
 	mimeHeaders := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
@@ -129,14 +128,19 @@ func sendValidationEmail_post(context *gin.Context) {
 
 	url := fmt.Sprintf("%s:%d/validation/email/validate?email=%s&code=%s", config.HOST, config.PORT, email_query, code)
 
-	t.Execute(&body, struct {
-		Name string
-		Link string
-	}{
-		Name: username_query,
-		Link: url,
+	context.HTML(http.StatusOK, "email_validation.html", gin.H{
+		"Name": username_query,
+		"Link": url,
 	})
 
+	/*	t.Execute(&body, struct {
+			Name string
+			Link string
+		}{
+			Name: username_query,
+			Link: url,
+		})
+	*/
 	from := "1519787190@qq.com"
 	password := "awowxbgooevfgbjc"
 
@@ -154,7 +158,7 @@ func sendValidationEmail_post(context *gin.Context) {
 	// 	return
 	// }
 
-	auth := post.LoginAuth(from, password)
+	auth := LoginAuth(from, password)
 
 	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, body.Bytes())
 	if err != nil {
@@ -173,6 +177,8 @@ func sendValidationEmail_post(context *gin.Context) {
 }
 
 func validateEmail_get(context *gin.Context) {
+	context.HTML(http.StatusOK, "email_validation_success.html", gin.H{})
+
 	r := context.Request
 	w := context.Writer
 	if api.CheckRequestMethodReturn(w, r, "get") {
@@ -238,9 +244,37 @@ func validateEmail_get(context *gin.Context) {
 	}
 
 	w.Header().Add("Content-Type", "text/html")
-	http.ServeFile(w, r, "email_validation_success.html")
+	//http.ServeFile(w, r, "email_validation_success.html")
+
 }
 func validEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
+}
+
+type loginAuth struct {
+	username string
+	password string
+}
+
+func LoginAuth(username, password string) smtp.Auth {
+	return &loginAuth{username, password}
+}
+
+func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", []byte(a.username), nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if more {
+		switch string(fromServer) {
+		case "Username:":
+			return []byte(a.username), nil
+		case "Password:":
+			return []byte(a.password), nil
+		default:
+			return nil, errors.New("unkown from server")
+		}
+	}
+	return nil, nil
 }

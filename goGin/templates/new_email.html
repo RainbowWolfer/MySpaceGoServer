@@ -1,0 +1,119 @@
+{{ define  "new_email.html"}}
+
+<style>
+    body {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+
+    .title {
+        font-size: 3.5rem;
+        margin-left: 2rem;
+    }
+
+    .image {
+        width: 150px;
+        height: 150px;
+    }
+
+    .head {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .content {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .content > div {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+    }
+
+    .button {
+        margin-top: 30px;
+        margin-bottom: 20px;
+        width: 180px;
+        text-align: center;
+        padding: 20px;
+        font-size: xx-large;
+        line-height: 24px;
+        letter-spacing: 1px;
+        display: inline-block;
+        background-color: transparent;
+        border-width: 4px;
+        border-style: solid;
+        text-decoration: none;
+        color: #000;
+        transition: all 0.3s ease-in;
+        position: relative;
+    }
+
+    .button:before {
+        content: '';
+        width: calc(100% + 8px);
+        opacity: 0;
+        height: calc(100% + 8px);
+        position: absolute;
+        left: -4px;
+        top: -4px;
+        transition: all 0.2s ease-in;
+        z-index: -1;
+    }
+
+    .button:hover:before {
+        opacity: 1;
+    }
+
+    .button {
+        border-image: linear-gradient(to right, #61aec7, #ccd400) 1;
+        cursor: pointer;
+    }
+
+    .button:before {
+        background: linear-gradient(to right, #61aec7, #ccd400);
+    }
+</style>
+<div class="head" style="text-align: center;">
+    <img src="./uploads/avatars/DefaultAvatar.png" class="image" style="text-align: center;">
+    <label class="title" style="text-align: center;">
+        My Space
+    </label>
+</div>
+<div class="content">
+    <div style="text-align:center;">
+        <h1 style="text-align:center;">
+            Hi, {{.Name}}!
+        </h1>
+        <h2 style="text-align:center;">
+            Thanks for registering 'My Space'.
+        </h2>
+        <h2 style="text-align:center;">
+            Finish your registeration by clicking
+            <a href="{{.Link}}">
+                this link
+            </a>
+            or button below
+        </h2>
+        <a class="button" href="{{.Link}}">
+            Click Me!
+        </a>
+    </div>
+</div>
+<div style="text-align: center;">
+    <label>
+        By 'My Space' @RainbowWolfer
+    </label>
+</div>

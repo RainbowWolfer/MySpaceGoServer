@@ -9,16 +9,16 @@ import (
 	"rainbowwolfer/myspacegoserver/model"
 )
 
-func LoginHandler() ginTools.RouteMap {
+func LoginHandler() *ginTools.RouteMap {
 	routeMap := ginTools.NewRouteMap()
 
 	routeMap.AddRoute(ginTools.Route{
 		Name:   "/login",
 		Fun:    tryLogin_get,
-		Method: http.MethodPost,
+		Method: http.MethodGet,
 	})
 	// 可以读取url中的参数
-	return *routeMap
+	return routeMap
 }
 
 //Login - Get

@@ -45,12 +45,12 @@ func UserHandler() (string, ginTools.RouteMap) {
 	routeMap.AddRoute(ginTools.Route{
 		Name:   "/getFollowers",
 		Fun:    getUserFollowers_get,
-		Method: http.MethodPost,
+		Method: http.MethodGet,
 	})
 	routeMap.AddRoute(ginTools.Route{
 		Name:   "/postsAndFollowersCount",
 		Fun:    getPostsAndFollowersCount_get,
-		Method: http.MethodPost,
+		Method: http.MethodGet,
 	})
 
 	// 可以读取url中的参数
