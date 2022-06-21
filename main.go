@@ -2063,6 +2063,106 @@ func deletePost_post(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "success")
 }
 
+func getMessageContacts_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "email", "password") {
+		return
+	}
+	email := query["email"][0]
+	password := query["password"][0]
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	user_id, err := model.GetUserID(database, email, password)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if user_id == -1 {
+		api.HttpError(w, "User not found", http.StatusBadRequest)
+		return
+	}
+
+	sql := fmt.Sprintf("call GetMessageContacts(%d);", user_id)
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var list []model.MessageContact
+	for rows.Next() {
+		item, err := model.ReadMessageContact(rows)
+		if err != nil {
+			api.HttpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		list = append(list, item)
+	}
+
+	fmt.Fprint(w, api.ToJson(list))
+}
+
+func getMessages_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "email", "password", "offset", "limit") {
+		return
+	}
+
+	email := query["email"][0]
+	password := query["password"][0]
+	offset := query["offset"][0]
+	limit := query["limit"][0]
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	user_id, err := model.GetUserID(database, email, password)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if user_id == -1 {
+		api.HttpError(w, "User not found", http.StatusBadRequest)
+		return
+	}
+	sql := fmt.Sprintf("call GetMessagesByReceiverID(%d,%s,%s);", user_id, offset, limit)
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	
+	var list []model.Message
+	for rows.Next() {
+		item, err := model.ReadMessage(rows)
+		if err != nil {
+			api.HttpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		list = append(list, item)
+	}
+
+	fmt.Fprint(w, api.ToJson(list))
+}
+
 func main() {
 	println(api.Now())
 	mux := http.NewServeMux()
@@ -2099,6 +2199,9 @@ func main() {
 	mux.HandleFunc("/collections/add", addToCollection_post)     //post
 	mux.HandleFunc("/collections/remove", removeCollection_post) //post
 	mux.HandleFunc("/collections", getCollections_get)           //get
+
+	mux.HandleFunc("/message/contacts", getMessageContacts_get) //get
+	mux.HandleFunc("/message/get", getMessages_get)             //get
 
 	mux.HandleFunc("/admin/clearunusedpostimages", handlers.ClearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", handlers.ReinflateDefaultPosts)

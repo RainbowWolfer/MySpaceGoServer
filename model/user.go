@@ -25,7 +25,7 @@ func ReadUser(rows *sql.Rows) (User, error) {
 		&user.ProfileDescription,
 		&user.IsFollowing,
 	); err != nil {
-		return User{}, errors.New("User Convert Error" + err.Error())
+		return User{}, errors.New("User Convert Error " + err.Error())
 	}
 	return user, nil
 }

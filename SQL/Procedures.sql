@@ -431,8 +431,8 @@ DELIMITER @@
 CREATE PROCEDURE GetMessagesByReceiverID(IN user_id INT, IN _offset INT, IN _length INT)
 BEGIN
 	SELECT 
-		* 	
-	FROM messages_view
+		*
+	FROM messages
 	WHERE m_receiver = user_id
 	LIMIT _offset, _length;
 END @@
@@ -470,10 +470,37 @@ DELIMITER ;
 
 CALL FlagUnread(2,1);
 
+DROP PROCEDURE IF EXISTS GetMessageContacts;
+DELIMITER @@
+CREATE PROCEDURE GetMessageContacts(IN user_id INT)
+BEGIN
+	SELECT 
+		m_sender, u_username, 
+		(SELECT a.m_text_content 
+			FROM messages_view a 
+			WHERE a.m_sender = b.m_sender
+			ORDER BY a.m_datetime DESC
+			LIMIT 1
+		) AS m_text_content,
+		(SELECT a.m_datetime 
+			FROM messages_view a 
+			WHERE a.m_sender = b.m_sender
+			ORDER BY a.m_datetime DESC
+			LIMIT 1
+		) AS m_datetime,
+		(SELECT a.m_has_received
+			FROM messages_view a 
+			WHERE a.m_sender = b.m_sender
+			ORDER BY a.m_datetime DESC
+			LIMIT 1
+		) AS m_has_received
+	FROM messages_view b
+	WHERE m_receiver = user_id AND m_datetime > DATE(NOW() - INTERVAL 7 DAY)
+	GROUP BY m_sender;
+END @@
+DELIMITER ;
 
-
-
-
+CALL GetMessageContacts(2);
 
 
 
