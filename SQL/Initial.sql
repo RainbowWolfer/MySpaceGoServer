@@ -110,6 +110,18 @@ CREATE TABLE user_collections(
 	UNIQUE(uc_id_user, uc_id_target)
 );
 
+DROP TABLE IF EXISTS messages;
+CREATE TABLE messages(
+	m_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	m_sender INT NOT NULL,
+	m_receiver INT NOT NULL,
+	m_datetime DATETIME NOT NULL DEFAULT(NOW()),
+	m_text_content VARCHAR(2000) NOT NULL,
+	m_has_received BOOL DEFAULT FALSE,
+	FOREIGN KEY (m_sender) REFERENCES users(u_id),
+	FOREIGN KEY (m_receiver) REFERENCES users(u_id)
+);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 

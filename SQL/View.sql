@@ -121,3 +121,19 @@ SELECT * FROM collections_view WHERE uc_id_user = 1 LIMIT 0,15;
 
 
 
+
+DROP VIEW IF EXISTS messages_view;
+CREATE VIEW messages_view AS
+SELECT
+	m.*,
+	sender.*,
+	IF(IFNULL(uf_id, 0) = 0, 0, 1) AS u_is_following
+FROM messages m
+LEFT JOIN users sender ON sender.u_id = m.m_sender
+LEFT JOIN users_follows uf ON uf_id_target = m.m_receiver AND uf_id_follower = sender.u_id;
+
+
+SELECT * FROM messages_view;
+
+
+
