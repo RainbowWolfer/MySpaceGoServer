@@ -1,11 +1,9 @@
 package main
 
 import (
-	"GoWeb/domain"
-	"GoWeb/goGin/ginTools"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"rainbowwolfer/myspacegoserver/goGin/ginTools"
 )
 
 func GetParaMap2() (string, ginTools.RouteMap) {
@@ -28,26 +26,6 @@ func GetParaMap2() (string, ginTools.RouteMap) {
 	})
 
 	// ShouldBind 自动绑定
-	routeMap.AddRoute(ginTools.Route{
-		Name: "/getUser",
-		Fun: func(context *gin.Context) {
-			u := &domain.User{}
-
-			/*
-				ShouldBind能够基于请求的不同，自动提取JSON、form表单和QueryString类型的数据，并把值绑定到指定的结构体对象。
-			*/
-			if err := context.ShouldBind(u); err != nil {
-				context.JSON(http.StatusOK, gin.H{
-					"err": err.Error(),
-				})
-			} else {
-				context.JSON(http.StatusOK, u)
-				fmt.Printf("%#v", u)
-
-			}
-		},
-		Method: http.MethodGet,
-	})
 
 	// 表单提交
 	routeMap.AddRoute(ginTools.Route{
@@ -64,23 +42,6 @@ func GetParaMap2() (string, ginTools.RouteMap) {
 	})
 
 	// 可以读取url中的参数
-	routeMap.AddRoute(ginTools.Route{
-		Name: "/fromForm2",
-		Fun: func(context *gin.Context) {
-			u := &domain.User{}
-			if err := context.ShouldBind(&u); err != nil {
-				context.JSON(http.StatusOK, gin.H{
-					"err": err.Error(),
-				})
-			} else {
-				context.JSON(http.StatusOK, u)
-				fmt.Println("转换成功")
-				fmt.Printf("%#v", u)
-
-			}
-		},
-		Method: http.MethodGet,
-	})
 	return "/getPara", *routeMap
 }
 

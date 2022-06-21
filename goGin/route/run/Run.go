@@ -1,8 +1,8 @@
 package main
 
 import (
-	"GoWeb/goGin/ginTools"
-	"GoWeb/goGin/route"
+	"rainbowwolfer/myspacegoserver/goGin/ginTools"
+	"rainbowwolfer/myspacegoserver/goGin/route"
 )
 
 func main() {
