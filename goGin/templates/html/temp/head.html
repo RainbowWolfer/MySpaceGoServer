@@ -1,0 +1,24 @@
+{{define  "html/temp/head.html"}}
+
+    {{/*数据流动方向 --》 主 --> 从 */}}
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+        {{/*        构建完后静态文件 路径*/}}
+        <link rel="stylesheet" href="/static/css/head.css">
+    </head>
+    <body>
+    <h1> 此乃html/temp/head.html </h1>
+    <h3>
+        font/head.html 公共头部--{{ UnixToTime  164086974}} </br>
+        font/head.html 公共头部--{{ UnixToTime  .date}}
+    </h3>
+    <h3>
+        {{ .mode}}
+    </h3>
+
+    </body>
+    </html>
+{{end}}

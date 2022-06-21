@@ -1,0 +1,85 @@
+{{define "html/back/goods.html"}}
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+
+    <h1> 此乃html/back/goods.html </h1>
+
+    {{/*  仅仅相当于把 文件代码复制过来 再解析
+     导入外部文件 数据流向 主--> 从
+        css 从 -->主
+*/}}
+    {{template "html/temp/head.html" . }}
+    <h4>html/temp/head.html-->html/back/goods. {{ .age}}  </h4> </br>
+
+    <body>
+
+    <h1>爱上撒旦是地方发</h1><br>
+    <h2>{{.user}} ：go 模板</h2>
+
+    {{/*    定义变量 */}}
+    定义变量 {{$use :=.user }}<br>
+    输出变量{{$use}}<br>
+
+    <p>
+
+        {{if gt 1 12 }}
+            1>=12 ,e,eq相等
+        {{else if gt  1 12}}
+            l 左小 g 左大
+
+        {{else}}
+            1<12
+        {{end}}
+    </p><br>
+    <h2>循环数据</h2>
+
+    <ul>
+        {{range $k ,$v:=.names}}
+
+            <li> {{$k}}---{{$v}}--{{$use}} </li>
+        {{end }}
+        <br />
+
+        {{range $k ,$v:=.nilList}}
+            <li> {{$k}}---{{$v}}--{{$use}} </li>
+        {{else}}
+            <li> 没有数据</li>
+
+        {{end }}
+
+    </ul>
+
+    <h2> with 解构结构体</h2>
+    <table border="1" cellspacing="2" cellpadding="2">
+        <tr>
+            <td>{{$use.Name}}</td>
+            <td>{{$use.Addr}}</td>
+        </tr>
+        <tr>
+            {{with .user}}
+                <td>{{.Name}}</td>
+                <td>{{.Addr}}</td>
+            {{end}}
+        </tr>
+
+    </table>
+
+    <div>
+        <div>
+            <h1>预定义函数</h1>
+            len (字符长度).nam+-es: {{len .names}}
+        </div>
+        <div>
+            <h6>  {{.date}}  </h6>
+            <h6>  {{UnixToTime .date}}  </h6>
+            <h6>  {{StringJoin .user.Name  $use.Addr}}  </h6>
+        </div>
+    </div>
+    </body>
+
+    </html>
+{{end }}
