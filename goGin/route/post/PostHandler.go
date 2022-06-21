@@ -28,16 +28,16 @@ func PostHandler() (string, ginTools.RouteMap) {
 
 	//post/get
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/delete", // deletePost_post)
+		Name:   "/delete", // deletePost_post)
 		Fun:    deletePost_post,
-		Method: http.MethodGet,
+		Method: http.MethodPost,
 	})
 
 	/**
 	getUserByUserID_get get
 	*/
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/user",
+		Name:   "/user",
 		Fun:    getUserByUserID_get,
 		Method: http.MethodGet,
 	})
@@ -46,66 +46,61 @@ func PostHandler() (string, ginTools.RouteMap) {
 	getPostByID_get
 	*/
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/id",
+		Name:   "/id",
 		Fun:    getPostByID_get,
 		Method: http.MethodGet,
 	}) //get
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/images", // getPostImage_get
+		Name:   "/images", // getPostImage_get
 		Fun:    getPostImage_get,
 		Method: http.MethodGet,
 	}) //get
 
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/comment", // comment_post_get
+		Name:   "/comment", // comment_post_get
 		Fun:    comment_post_get,
 		Method: http.MethodGet,
 	}) //post/get
 
 	// post/comment/vote
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/comment/vote", //voteComment_post
+		Name:   "/comment/vote", //voteComment_post
 		Fun:    voteComment_post,
-		Method: http.MethodGet,
+		Method: http.MethodPost,
 	}) //get
 
 	// /post/comments
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/comments", // getPostComments_get
+		Name:   "/comments", // getPostComments_get
 		Fun:    getPostComments_get,
 		Method: http.MethodGet,
 	}) //get
 
 	// /post/vote  post
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/vote", // votePost_post
+		Name:   "/vote", // votePost_post
 		Fun:    votePost_post,
-		Method: http.MethodGet,
+		Method: http.MethodPost,
 	})
 
 	// post/repost repost_post
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/repost", // repost_post
+		Name:   "/repost", // repost_post
 		Fun:    repost_post,
-		Method: http.MethodGet,
+		Method: http.MethodPost,
 	})
 
 	//removeCollection_post post
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/repostRecords", // getRepostRecords_get
+		Name:   "/repostRecords", // getRepostRecords_get
 		Fun:    getRepostRecords_get,
 		Method: http.MethodGet,
 	})
 
 	//getCollections_get get
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/scoreRecords", // getScoreRecords_get
+		Name:   "/scoreRecords", // getScoreRecords_get
 		Fun:    getScoreRecords_get,
-		Method: http.MethodGet,
-	})
-	routeMap.AddRoute(ginTools.Route{
-		Name:   "/post/scoreRecords", // getScoreRecords_get
-		Fun:    getRepostRecords_get,
 		Method: http.MethodGet,
 	})
 

@@ -1,7 +1,6 @@
 package ginTools
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"html/template"
 	"net/http"
@@ -37,8 +36,6 @@ func (receiver *EngineInfo) RunServer() {
 	err := receiver.Engine.Run(build.String())
 	if err != nil {
 		panic("失败了 ！！")
-	} else {
-		fmt.Println("成功启动 !!!!!!!!!!")
 	}
 }
 func (receiver *EngineInfo) SetFuncMap(funcMap template.FuncMap) *EngineInfo {
@@ -69,6 +66,8 @@ func (receiver *EngineInfo) AddRouteMap(routes *RouteMap) *EngineInfo {
 			receiver.Engine.PUT(route.Name, route.Fun)
 		case http.MethodPost:
 			receiver.Engine.POST(route.Name, route.Fun)
+		case http.MethodDelete:
+			receiver.Engine.DELETE(route.Name, route.Fun)
 		default:
 			receiver.Engine.GET(route.Name, route.Fun)
 		}

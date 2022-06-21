@@ -1,70 +1,71 @@
-
 {{ define  "email_validation_success.html"}}
 
-<!DOCTYPE html>
-<html>
+    <!DOCTYPE html>
+    <html>
 
-<body>
+    <body>
     <div>
         <h1>You have successfully registered!</h1>
         <a class="button" href="javascript:close_window();">Click to Dismiss</a>
     </div>
-</body>
+    </body>
 
-<script>
-    function close_window() {
-        window.close()
-    }
-</script>
+    <script>
+        function close_window() {
+            window.close()
+        }
+    </script>
 
-<style>
-    body {
-        text-align: center;
-    }
+    <style>
+        body {
+            text-align: center;
+        }
 
-    .button {
-        margin-top: 10px;
-        margin-bottom: 10px;
-        width: 280px;
-        text-align: center;
-        padding: 20px;
-        font-size: xx-large;
-        line-height: 24px;
-        letter-spacing: 1px;
-        display: inline-block;
-        background-color: transparent;
-        border-width: 4px;
-        border-style: solid;
-        text-decoration: none;
-        color: #000;
-        transition: all 0.3s ease-in;
-        position: relative;
-    }
+        .button {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            width: 280px;
+            text-align: center;
+            padding: 20px;
+            font-size: xx-large;
+            line-height: 24px;
+            letter-spacing: 1px;
+            display: inline-block;
+            background-color: transparent;
+            border-width: 4px;
+            border-style: solid;
+            text-decoration: none;
+            color: #000;
+            transition: all 0.3s ease-in;
+            position: relative;
+        }
 
-    .button:before {
-        content: '';
-        width: calc(100% + 8px);
-        opacity: 0;
-        height: calc(100% + 8px);
-        position: absolute;
-        left: -4px;
-        top: -4px;
-        transition: all 0.2s ease-in;
-        z-index: -1;
-    }
+        .button:before {
+            content: '';
+            width: calc(100% + 8px);
+            opacity: 0;
+            height: calc(100% + 8px);
+            position: absolute;
+            left: -4px;
+            top: -4px;
+            transition: all 0.2s ease-in;
+            z-index: -1;
+        }
 
-    .button:hover:before {
-        opacity: 1;
-    }
+        .button:hover:before {
+            opacity: 1;
+        }
 
-    .button {
-        border-image: linear-gradient(to right, #61aec7, #ccd400) 1;
-        cursor: pointer;
-    }
+        .button {
+            border-image: linear-gradient(to right, #61aec7, #ccd400) 1;
+            cursor: pointer;
+        }
 
-    .button:before {
-        background: linear-gradient(to right, #61aec7, #ccd400);
-    }
-</style>
+        .button:before {
+            background: linear-gradient(to right, #61aec7, #ccd400);
+        }
+    </style>
 
-</html>
+    </html>
+
+{{end }}

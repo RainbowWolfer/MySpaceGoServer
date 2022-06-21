@@ -19,7 +19,7 @@ func ValidationHandler() (string, ginTools.RouteMap) {
 	routeMap := ginTools.NewRouteMap()
 
 	routeMap.AddRoute(ginTools.Route{
-		Name:   "/",
+		Name:   "/email/send",
 		Fun:    sendValidationEmail_post,
 		Method: http.MethodPost,
 	})
@@ -177,7 +177,6 @@ func sendValidationEmail_post(context *gin.Context) {
 }
 
 func validateEmail_get(context *gin.Context) {
-	context.HTML(http.StatusOK, "email_validation_success.html", gin.H{})
 
 	r := context.Request
 	w := context.Writer
@@ -244,9 +243,9 @@ func validateEmail_get(context *gin.Context) {
 	}
 
 	w.Header().Add("Content-Type", "text/html")
-	//http.ServeFile(w, r, "email_validation_success.html")
-
+	http.ServeFile(w, r, "email_validation_success.html")
 }
+
 func validEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil

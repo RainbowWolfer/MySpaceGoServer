@@ -10,7 +10,7 @@ import (
 	"rainbowwolfer/myspacegoserver/goGin/route/validation"
 )
 
-func main() {
+func tests() {
 	engine := ginTools.NewDefaultEngine(8080)
 	engine.SetFuncMap(route.AllMethodMap())
 	//tempPath := "goGin/templates/**/**/*"
@@ -34,4 +34,8 @@ func main() {
 	engine.AddGroupRouteMap(admin.AdminHandler())
 
 	engine.AddGroupRouteMap(user.UserHandler()).RunServer()
+}
+func main() {
+	tests()
+	//test2()
 }
