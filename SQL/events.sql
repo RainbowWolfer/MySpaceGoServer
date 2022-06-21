@@ -7,11 +7,11 @@ CREATE	/*[DEFINER = { user | CURRENT_USER }]*/	EVENT `wjx`.`auto_delete_email_va
 ON SCHEDULE
 	 /* uncomment the example below you want to use */
 
-	-- scheduleexample 1: run once
+	-- scheduleexample 1: test once
 
 	   --  AT 'YYYY-MM-DD HH:MM.SS'/CURRENT_TIMESTAMP { + INTERVAL 1 [HOUR|MONTH|WEEK|DAY|MINUTE|...] }
 
-	-- scheduleexample 2: run at intervals forever after creation
+	-- scheduleexample 2: test at intervals forever after creation
 
 	   EVERY 1 HOUR
 

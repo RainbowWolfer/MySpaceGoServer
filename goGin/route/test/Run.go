@@ -3,6 +3,7 @@ package main
 import (
 	"rainbowwolfer/myspacegoserver/goGin/ginTools"
 	"rainbowwolfer/myspacegoserver/goGin/route"
+	"rainbowwolfer/myspacegoserver/goGin/route/user"
 )
 
 func main() {
@@ -17,6 +18,5 @@ func main() {
 	engine.Static("/static", staticPath)
 
 	engine.AddGroupRouteMap(path, *routeMap)
-	engine.AddGroupRouteMap(route.ReturnTemplateMap())
-	engine.AddGroupRouteMap(route.GetParaMap()).RunServer()
+	engine.AddGroupRouteMap(user.UserHandler()).RunServer()
 }

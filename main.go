@@ -2076,8 +2076,9 @@ func main() {
 	mux.HandleFunc("/user/follow", userFollow_post)                               //post
 	mux.HandleFunc("/user/getFollowers", getUserFollowers_get)                    //get
 	mux.HandleFunc("/user/postsAndFollowersCount", getPostsAndFollowersCount_get) //get
-	mux.HandleFunc("/login", tryLogin_get)                                        //get
-	mux.HandleFunc("/upload/avatar", uploadAvatar_post)                           //post
+
+	mux.HandleFunc("/login", tryLogin_get)              //get
+	mux.HandleFunc("/upload/avatar", uploadAvatar_post) //post
 
 	mux.HandleFunc("/validation/email/send", sendValidationEmail_post) //post
 	mux.HandleFunc("/validation/email/validate", validateEmail_get)    //get
