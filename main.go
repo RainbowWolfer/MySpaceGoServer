@@ -661,7 +661,7 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 		replyVisibility := r.MultipartForm.Value["reply_visibility"][0]
 		tags := strings.Split(r.MultipartForm.Value["tags"][0], "&#10;")
 		images := r.MultipartForm.File["post_images"]
-	
+
 		for _, header := range images {
 			if header.Size > MAX_UPLOAD_SIZE {
 				api.HttpError(w, fmt.Sprintf("The uploaded image is too big: %s. Please use an image less than 1MB in size", header.Filename), http.StatusBadRequest)
@@ -938,7 +938,7 @@ func comment_post_get(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 		}
-		
+
 		var obj model.NewComment
 		err = json.Unmarshal(body, &obj)
 		if err != nil {
@@ -1510,7 +1510,7 @@ func addToCollection_post(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
 		return
 	}
-	
+
 	errorMessage := ""
 	if api.IsEmpty(&obj.Email) {
 		errorMessage += "Missing paramter 'email'\n"
@@ -1605,7 +1605,7 @@ func getCollections_get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql := fmt.Sprintf("SELECT * FROM collections_view WHERE uc_id_user = %d LIMIT %d,%d;", user_id, offset, limit)
-	
+
 	rows, err := database.Query(sql)
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
@@ -2105,7 +2105,7 @@ func getMessages_get(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, "User not found", http.StatusBadRequest)
 		return
 	}
-	
+
 	sql := fmt.Sprintf("call GetMessagesByContact(%d,%s,%s,%s);", user_id, contact_id, offset, limit)
 	rows, err := database.Query(sql)
 	if err != nil {
@@ -2183,6 +2183,14 @@ func flagUnread_post(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func resetPassword_post(w http.ResponseWriter, r *http.Request){
+	if api.CheckRequestMethodReturn(w, r, "post") {
+		return
+	}
+	
+	
+}
+
 func main() {
 	println(api.Now())
 	mux := http.NewServeMux()
@@ -2196,6 +2204,7 @@ func main() {
 	mux.HandleFunc("/user/follow", userFollow_post)                               //post
 	mux.HandleFunc("/user/getFollowers", getUserFollowers_get)                    //get
 	mux.HandleFunc("/user/postsAndFollowersCount", getPostsAndFollowersCount_get) //get
+	mux.HandleFunc("/user/resetPassword", resetPassword_post) //get
 
 	mux.HandleFunc("/login", tryLogin_get)              //get
 	mux.HandleFunc("/upload/avatar", uploadAvatar_post) //post
