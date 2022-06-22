@@ -11,6 +11,7 @@ import (
 )
 
 func tests() {
+
 	engine := ginTools.NewDefaultEngine(8080)
 	engine.SetFuncMap(route.AllMethodMap())
 	//tempPath := "goGin/templates/**/**/*"
@@ -36,6 +37,7 @@ func tests() {
 	engine.AddGroupRouteMap(user.UserHandler()).RunServer()
 }
 func main() {
+
 	tests()
 	//test2()
 }
