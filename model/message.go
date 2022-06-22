@@ -34,7 +34,7 @@ type MessageContact struct {
 	Username    string
 	TextContent string
 	DateTime    string
-	HasUnread   bool
+	UnreadCount   int
 }
 
 func ReadMessageContact(rows *sql.Rows) (MessageContact, error) {
@@ -44,7 +44,7 @@ func ReadMessageContact(rows *sql.Rows) (MessageContact, error) {
 		&item.Username,
 		&item.TextContent,
 		&item.DateTime,
-		&item.HasUnread,
+		&item.UnreadCount,
 	); err != nil {
 		return MessageContact{}, errors.New("MessageContact Convert Error " + err.Error())
 	}

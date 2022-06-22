@@ -2117,12 +2117,13 @@ func getMessages_get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := r.URL.Query()
-	if api.CheckMissingParamters(w, query, true, "email", "password", "offset", "limit") {
+	if api.CheckMissingParamters(w, query, true, "email", "password", "contact_id", "offset", "limit") {
 		return
 	}
 
 	email := query["email"][0]
 	password := query["password"][0]
+	contact_id := query["contact_id"][0]
 	offset := query["offset"][0]
 	limit := query["limit"][0]
 
@@ -2142,14 +2143,15 @@ func getMessages_get(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, "User not found", http.StatusBadRequest)
 		return
 	}
-	sql := fmt.Sprintf("call GetMessagesByReceiverID(%d,%s,%s);", user_id, offset, limit)
+	
+	sql := fmt.Sprintf("call GetMessagesByContact(%d,%s,%s,%s);", user_id, contact_id, offset, limit)
 	rows, err := database.Query(sql)
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
-	
+
 	var list []model.Message
 	for rows.Next() {
 		item, err := model.ReadMessage(rows)
@@ -2161,6 +2163,62 @@ func getMessages_get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, api.ToJson(list))
+}
+
+func flagReceived_post(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj model.FlagMessage
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err = obj.CheckValid(); err != nil {
+		api.HttpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	user_id, err := model.GetUserID(database, obj.Email, obj.Password)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if user_id == -1 {
+		api.HttpError(w, "User not found", http.StatusBadRequest)
+		return
+	}
+
+	sql := fmt.Sprintf("CALL FlagHasReceived(%d,%s);", user_id, obj.SenderID)
+	_, err = database.Exec(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "success")
+}
+
+func flagUnread_post(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "post") {
+		return
+	}
+
 }
 
 func main() {
@@ -2202,6 +2260,8 @@ func main() {
 
 	mux.HandleFunc("/message/contacts", getMessageContacts_get) //get
 	mux.HandleFunc("/message/get", getMessages_get)             //get
+	mux.HandleFunc("/message/flagReceived", flagReceived_post)  //post
+	mux.HandleFunc("/message/flagUnread", flagUnread_post)      //post
 
 	mux.HandleFunc("/admin/clearunusedpostimages", handlers.ClearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", handlers.ReinflateDefaultPosts)

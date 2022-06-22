@@ -433,12 +433,29 @@ BEGIN
 	SELECT 
 		*
 	FROM messages
-	WHERE m_receiver = user_id
+	WHERE m_receiver = user_id OR (m_sender = user_id )
 	LIMIT _offset, _length;
 END @@
 DELIMITER ;
 
 CALL GetMessagesByReceiverID(2,0,10);
+
+
+DROP PROCEDURE IF EXISTS GetMessagesByContact;
+DELIMITER @@
+CREATE PROCEDURE GetMessagesByContact(IN user_id INT, IN sender_id INT, IN _offset INT, IN _length INT)
+BEGIN
+	SELECT 
+		*
+	FROM messages
+	WHERE (m_receiver = user_id AND m_sender = sender_id) 
+		OR (m_receiver = sender_id AND m_sender = user_id)
+	ORDER BY m_datetime DESC
+	LIMIT _offset, _length;
+END @@
+DELIMITER ;
+
+CALL GetMessagesByContact(2,1,0,10);
 
 
 DROP PROCEDURE IF EXISTS FlagHasReceived;
@@ -478,21 +495,21 @@ BEGIN
 		m_sender, u_username, 
 		(SELECT a.m_text_content 
 			FROM messages_view a 
-			WHERE a.m_sender = b.m_sender
+			WHERE (m_receiver = user_id AND m_sender = b.m_sender) 
+				OR (m_receiver = b.m_sender AND m_sender = user_id)
 			ORDER BY a.m_datetime DESC
 			LIMIT 1
 		) AS m_text_content,
 		(SELECT a.m_datetime 
 			FROM messages_view a 
-			WHERE a.m_sender = b.m_sender
+			WHERE (m_receiver = user_id AND m_sender = b.m_sender) 
+				OR (m_receiver = b.m_sender AND m_sender = user_id)
 			ORDER BY a.m_datetime DESC
 			LIMIT 1
 		) AS m_datetime,
-		(SELECT a.m_has_received
-			FROM messages_view a 
-			WHERE a.m_sender = b.m_sender
-			ORDER BY a.m_datetime DESC
-			LIMIT 1
+		(SELECT COUNT(m_has_received) 
+			FROM messages 
+			WHERE m_sender = 1 AND m_has_received = 0
 		) AS m_has_received
 	FROM messages_view b
 	WHERE m_receiver = user_id AND m_datetime > DATE(NOW() - INTERVAL 7 DAY)
@@ -501,8 +518,6 @@ END @@
 DELIMITER ;
 
 CALL GetMessageContacts(2);
-
-
 
 
 
