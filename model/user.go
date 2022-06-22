@@ -32,7 +32,7 @@ func ReadUser(rows *sql.Rows) (User, error) {
 
 func GetUserID(db *sql.DB, email string, pasword string) (int, error) {
 	sql := fmt.Sprintf("select u_id from users where u_email = '%s' and u_password = '%s';", email, pasword)
-	println(sql)
+	// println(sql)
 	rows, err := db.Query(sql)
 	if err != nil {
 		return -1, err

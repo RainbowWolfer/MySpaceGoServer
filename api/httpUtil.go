@@ -37,6 +37,7 @@ func HttpErrorWithCode(w http.ResponseWriter, content string, code int, errorCod
 }
 
 func CheckRequestMethodReturn(w http.ResponseWriter, r *http.Request, method string) bool {
+	println(r.RequestURI)
 	if !strings.EqualFold(r.Method, method) {
 		HttpError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return true
@@ -46,6 +47,7 @@ func CheckRequestMethodReturn(w http.ResponseWriter, r *http.Request, method str
 }
 
 func CheckRequestMethod(r *http.Request, method string) error {
+	println(r.RequestURI)
 	if strings.EqualFold(r.Method, method) {
 		return nil
 	} else {

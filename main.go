@@ -290,8 +290,6 @@ func getAvatar_get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// println(bytes)
-	// println(bytes == nil)
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(bytes)
@@ -648,8 +646,6 @@ func updateUsername_post(w http.ResponseWriter, r *http.Request) {
 
 func post_post_get(w http.ResponseWriter, r *http.Request) {
 	if err := api.CheckRequestMethod(r, "post"); err == nil {
-		//post a post
-		// postPost(w, r)
 		if api.CheckRequestMethodReturn(w, r, "post") {
 			return
 		}
@@ -659,23 +655,13 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// println(r.MultipartForm.File)
-		// println(r.MultipartForm.Value)
-
 		content := r.MultipartForm.Value["content"][0]
 		publisherID := r.MultipartForm.Value["publisher_id"][0]
 		postVisibility := r.MultipartForm.Value["post_visibility"][0]
 		replyVisibility := r.MultipartForm.Value["reply_visibility"][0]
 		tags := strings.Split(r.MultipartForm.Value["tags"][0], "&#10;")
 		images := r.MultipartForm.File["post_images"]
-		// println("content is : " + content)
-		// println(publisherID)
-		// println(postVisibility)
-		// println(replyVisibility)
-		// println(strings.Join(tags, ","))
-
-		// println(images)
-		// println(len(images))
+	
 		for _, header := range images {
 			if header.Size > MAX_UPLOAD_SIZE {
 				api.HttpError(w, fmt.Sprintf("The uploaded image is too big: %s. Please use an image less than 1MB in size", header.Filename), http.StatusBadRequest)
@@ -722,7 +708,6 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 		}
 
 		joinedTags := ""
-		// println(tags)
 		if len(tags) != 0 {
 			tags = api.DeleteEmpty(tags)
 			joinedTags = strings.Join(tags, ",")
@@ -733,7 +718,6 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		// println(joinedTags)
 
 		sql = fmt.Sprintf("INSERT INTO posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visibility, p_reply, p_images_count, p_tags) VALUES ('%s',NOW(),NOW(),'%s','%s','%s','%d','%s')", publisherID, content, visibility, reply, len(images), joinedTags)
 		result, err := database.Exec(sql)
@@ -756,18 +740,12 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 			}
 			defer file.Close()
 			buff := make([]byte, 512)
-			// print("before: ")
-			// println(buff)
 			_, err = file.Read(buff)
 			if err != nil {
 				api.HttpError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			// print("after: ")
-			// println(buff)
 			filetype := http.DetectContentType(buff)
-			// println("file type is: " + filetype)
-			// println(filepath.Ext(header.Filename))
 			if filetype != "image/jpeg" && filetype != "image/jpg" && filetype != "image/png" {
 				api.HttpError(w, "The provided file format is not allowed. Please upload a JPEG(JPG) or PNG image", http.StatusBadRequest)
 				continue
@@ -885,7 +863,6 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		println(sql)
 		rows, err := database.Query(sql)
 		if err != nil {
 			api.HttpError(w, err.Error(), http.StatusInternalServerError)
@@ -912,7 +889,6 @@ func post_post_get(w http.ResponseWriter, r *http.Request) {
 
 		json := api.ToJson(posts)
 
-		println(len(posts))
 		fmt.Fprintln(w, json)
 	} else {
 		api.HttpError(w, "Only get or post method is allowed", http.StatusMethodNotAllowed)
@@ -962,8 +938,7 @@ func comment_post_get(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 		}
-		println(string(body))
-
+		
 		var obj model.NewComment
 		err = json.Unmarshal(body, &obj)
 		if err != nil {
@@ -1276,8 +1251,6 @@ func repost_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	println(fmt.Sprintf("%v", obj))
-
 	errorMessage := ""
 	if api.IsEmpty(&obj.OriginPostID) {
 		errorMessage += "Missing paramter 'origin_post_id'\n"
@@ -1326,7 +1299,6 @@ func repost_post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	joinedTags := ""
-	println(obj.Tags)
 	if len(obj.Tags) != 0 {
 		obj.Tags = api.DeleteEmpty(obj.Tags)
 		joinedTags = strings.Join(obj.Tags, ",")
@@ -1339,7 +1311,6 @@ func repost_post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql = fmt.Sprintf("INSERT INTO posts (p_publisher_id, p_publish_date, p_edit_date, p_text_content, p_visibility, p_reply, p_images_count, p_tags, p_is_repost, p_id_origin_post) VALUES ('%s',NOW(),NOW(),'%s','%s','%s',0,'%s',TRUE,'%s')", obj.PublisherID, obj.TextContent, obj.PostVisibility, obj.ReplyLimit, obj.Tags, obj.OriginPostID)
-	println(sql)
 
 	_, err = database.Exec(sql)
 	if err != nil {
@@ -1539,9 +1510,7 @@ func addToCollection_post(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	println(fmt.Sprintf("%v", obj))
-
+	
 	errorMessage := ""
 	if api.IsEmpty(&obj.Email) {
 		errorMessage += "Missing paramter 'email'\n"
@@ -1636,9 +1605,7 @@ func getCollections_get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql := fmt.Sprintf("SELECT * FROM collections_view WHERE uc_id_user = %d LIMIT %d,%d;", user_id, offset, limit)
-
-	println(sql)
-
+	
 	rows, err := database.Query(sql)
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
@@ -1772,8 +1739,6 @@ func getPostByID_get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, api.ToJson(post))
-
-	println(api.ToJson(post))
 }
 
 func userFollow_post(w http.ResponseWriter, r *http.Request) {
@@ -1792,8 +1757,6 @@ func userFollow_post(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	println(fmt.Sprintf("%v", obj))
 
 	errorMessage := ""
 	if api.IsEmpty(&obj.Email) {
@@ -1829,7 +1792,6 @@ func userFollow_post(w http.ResponseWriter, r *http.Request) {
 		sql = fmt.Sprintf("insert into users_follows (uf_id_follower, uf_id_target) values (%d,%s);", user_id, obj.TargetID)
 	}
 
-	println(sql)
 	_, err = database.Exec(sql)
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
