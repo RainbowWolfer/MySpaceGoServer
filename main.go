@@ -2186,6 +2186,7 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
 	}
+
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
@@ -2198,6 +2199,13 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("%v", obj)
+
+	if err = obj.CheckValid(); err != nil {
+		api.HttpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	database, err := api.GetDatabase()
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
@@ -2207,6 +2215,7 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 
 	//validate
 	sql := fmt.Sprintf("select * from email_password_resets where epr_email = '%s' and epr_code = '%s';", obj.Email, obj.Code)
+	println(sql)
 
 	rows, err := database.Query(sql)
 	if err != nil {
@@ -2220,13 +2229,37 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sql = fmt.Sprintf("update users set u_password = '%s' where u_email = '%s';", obj.Email, obj.NewPassword)
-	_, err = database.Exec(sql)
+	sql = fmt.Sprintf("update users set u_password = '%s' where u_email = '%s';", obj.NewPassword, obj.Email)
+	println(sql)
+	result, err := database.Exec(sql)
 
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	affectedRows, err := result.RowsAffected()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else if affectedRows == 0 {
+		api.HttpError(w, "None has been affected", http.StatusInternalServerError)
+		return
+	}
+
+	//delete validation from database
+	sql = fmt.Sprintf("DELETE FROM email_password_resets WHERE epr_email = '%s' AND epr_code = '%s';", obj.Email, obj.Code)
+	result, err = database.Exec(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	_, err = result.RowsAffected()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	} 
 
 	fmt.Fprint(w, "success")
 }

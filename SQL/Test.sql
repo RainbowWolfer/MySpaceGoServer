@@ -172,12 +172,12 @@ SELECT * FROM email_password_resets WHERE epr_email = '%s' AND epr_code = '%s';
 
 
 
+UPDATE users SET u_password = '1519787190@qq.com' WHERE u_email = '123';
 
 
 
 
-
-
+DELETE FROM email_password_resets WHERE epr_email = '%s' AND epr_code = '%s';
 
 
 
