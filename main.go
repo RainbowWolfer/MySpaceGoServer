@@ -21,6 +21,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/rs/cors"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -2178,6 +2180,9 @@ func flagUnread_post(w http.ResponseWriter, r *http.Request) {
 
 //change password in database
 func resetPassword_post(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
 	}
@@ -2211,7 +2216,7 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	if !rows.Next() {
-		api.HttpError(w, "Validate Email & Code Error", http.StatusBadRequest)
+		api.HttpError(w, "Validate Email And Code Error", http.StatusBadRequest)
 		return
 	}
 
@@ -2396,6 +2401,14 @@ func getResetPassword_html(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "html/reset_password.html")
 }
 
+func resetResult_html(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	w.Header().Add("Content-Type", "text/html")
+	http.ServeFile(w, r, "html/reset_result.html")
+}
+
 func main() {
 	println(api.Now())
 	mux := http.NewServeMux()
@@ -2414,6 +2427,7 @@ func main() {
 	mux.HandleFunc("/user/sendResetPasswordEmail", sendResetPasswordEmail_post) //post
 	mux.HandleFunc("/user/checkResetExists", checkResetExists_get)              //get
 	mux.HandleFunc("/page/resetPassword", getResetPassword_html)                //get
+	mux.HandleFunc("/page/resetResult", resetResult_html)                       //get
 
 	mux.HandleFunc("/login", tryLogin_get)              //get
 	mux.HandleFunc("/upload/avatar", uploadAvatar_post) //post
@@ -2449,7 +2463,8 @@ func main() {
 	mux.HandleFunc("/admin/clearunusedpostimages", handlers.ClearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", handlers.ReinflateDefaultPosts)
 
-	if err := http.ListenAndServe(":4500", mux); err != nil {
+	handler := cors.Default().Handler(mux)
+	if err := http.ListenAndServe(":4500", handler); err != nil {
 		log.Fatal(err)
 	}
 

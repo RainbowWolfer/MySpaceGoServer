@@ -33,3 +33,22 @@ DO
 	END$$
 
 DELIMITER ;
+
+
+
+
+
+DELIMITER $$
+
+CREATE EVENT `wjx`.`auto_delete_email_password_resets`
+
+ON SCHEDULE
+	   EVERY 1 HOUR
+
+DO
+	BEGIN
+		DELETE FROM `email_password_resets` 
+			WHERE epr_datetime < CURRENT_TIMESTAMP - INTERVAL 1 HOUR;
+	END$$
+
+DELIMITER ;
