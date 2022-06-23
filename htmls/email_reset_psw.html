@@ -3,47 +3,140 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <style>
+        .qmbox .button {
+            margin-top: 30px;
+            margin-bottom: 20px;
+            width: 180px;
+            text-align: center;
+            padding: 20px;
+            font-size: xx-large;
+            line-height: 24px;
+            letter-spacing: 1px;
+            display: inline-block;
+            background-color: transparent;
+            border-width: 4px;
+            border-style: solid;
+            text-decoration: none;
+            color: #000;
+            transition: all 0.3s ease-in;
+            position: relative;
+        }
+
+        .qmbox .button:before {
+            content: '';
+            width: calc(100% + 8px);
+            opacity: 0;
+            height: calc(100% + 8px);
+            position: absolute;
+            left: -4px;
+            top: -4px;
+            transition: all 0.2s ease-in;
+            z-index: -1;
+        }
+
+        .qmbox .button:hover:before {
+            opacity: 1;
+        }
+
+        .qmbox .button {
+            border-image: linear-gradient(to right, #61aec7, #ccd400) 1;
+            cursor: pointer;
+        }
+
+        .qmbox .button:before {
+            background: linear-gradient(to right, #61aec7, #ccd400);
+        }
+
+        .qmbox body {
+            text-align: center;
+        }
+
+        .qmbox .head {
+            justify-content: center;
+            display: flex;
+            align-items: center;
+        }
+
+        .qmbox .title {
+            font-size: 3.5rem;
+            margin-left: 2rem;
+        }
+
+        .qmbox .content div {
+            height: 100%;
+            width: 100%;
+        }
+
+        .qmbox .content {
+            margin-top: 30px;
+            margin-bottom: 20px;
+            display: inline-block;
+            padding: 30px;
+            border-style: solid;
+            border-width: 2px;
+            border-radius: 20px;
+            border-color: aqua;
+        }
+    </style>
+    <style type="text/css">.qmbox style, .qmbox script, .qmbox head, .qmbox link, .qmbox meta {
+        display: none !important;
+    }</style>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
           integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
     <title>登陆</title>
 </head>
 <body>
 <main class="main" role="main">
-    <div class="container">
-        <div class="row">
-            <div class="offset-md-3 col-md-6">
-                <form class="form-container">
-                    <h2>登陆</h2>
-                    <div class="form-group">
-                        <label for="exampleInputEmail1">用户名</label>
-                        <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp"
-                               placeholder="请输入用户名">
-                    </div>
-                    <div class="form-group">
-                        <label for="exampleInputPassword1">密码</label>
-                        <input type="password" class="form-control" id="exampleInputPassword1" placeholder="请输入密码">
-                    </div>
-                    <div class="form-group">
-                        <label for="exampleInputPassword1">重新输入密码</label>
-                        <input type="password" class="form-control" id="exampleInputPassword2" placeholder="请输入密码">
-                    </div>
-
-                    <div class="form-group form-check">
-                        <input type="checkbox" class="form-check-input" id="exampleCheck1">
-                        <label class="form-check-label" for="exampleCheck1">记住信息</label>
-                    </div>
-                    <button type="submit" class="btn btn-success btn-block">登录</button>
-                </form>
+    <div id="resetPsw">
+        <form class="form-container">
+            <h2>My Space</h2>
+            <div class="form-group">
+                <label>用户名
+                    <input type="email" aria-describedby="emailHelp" v-model="userInfo.email"
+                           placeholder="请输入用户名"></label>
             </div>
-        </div>
+
+            <div class="form-group">
+                <label>请输入密码
+                    <input type="email" aria-describedby="emailHelp" v-model="userInfo.psw"
+                           placeholder="请输入密码"></label>
+            </div>
+            <div class="form-group">
+                <label>请确认密码
+                    <input type="email" aria-describedby="emailHelp" v-model="userInfo.psw"
+                           placeholder="请确认密码"></label>
+            </div>
+            <button type="submit" class="btn btn-success btn-block">登录</button>
+        </form>
+
     </div>
 </main>
+
+
 <div class="footer">
-    <div class="con
-    By 'My Space' @RainbowWolfertainer">
-    </div>
+    <h6>By'My Space' @RainbowWolfertainer </h6>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script type="text/javascript">
 
+    new Vue({
+        el: 'resetPsw',
+        data: {
+            userInfo: {
+                email: "",
+                psw: ""
+            }
+
+        },
+        methods: {
+            submit() {
+                console.log(JSON.stringify(this.userInfo))
+            }
+        }
+    })
+
+
+</script>
 </body>
 </html>
