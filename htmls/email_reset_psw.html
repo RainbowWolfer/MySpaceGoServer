@@ -1,32 +1,35 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>登陆</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
 </head>
 <body>
 <main class="main" role="main">
     <div id="resetPsw">
-        <form @submit.prevnet="demo">
+        <form @submit="demo">
             <h2>My Space</h2>
             <div class="form-group">
                 <label>用户名
-                    <input type="email" v-model="userInfo.email"
-                           placeholder="请输入用户名"></label>
+                    <input type="email" v-model.trim="userInfo.email"
+                           placeholder="请输入邮箱"></label>
             </div>
 
             <div class="form-group">
                 <label>请输入密码
-                    <input type="password" v-model="userInfo.psw"
+                    <input type="password" v-model.trim="userInfo.psw"
                            placeholder="请输入密码"></label>
             </div>
             <div class="form-group">
                 <label>请确认密码
-                    <input type="password" v-model="userInfo.psw"
+                    <input type="password" v-model.trim="userInfo.psw"
                            placeholder="请确认密码"></label>
             </div>
-            <button type="submit" > 登录</button>
+            <button type="submit" v-on="submit"> 登录</button>
         </form>
 
     </div>
@@ -36,8 +39,6 @@
 <div class="footer">
     <h6>By'My Space' @RainbowWolfertainer </h6>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
-<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 
 <script type="text/javascript">
 
@@ -59,8 +60,13 @@
                 /*
                 * 整理成 json 格式
                 * */
+
+
+                /*
+                数据格式：：：：  {"email":"","psw":""}
+                */
                 console.log(JSON.stringify(this.userInfo))
-                axios.post('http://ipaddress', JSON.stringify(this.userInfo), {
+                axios.post('http://192.168.20.9:8080/routeMap/getPara', JSON.stringify(this.userInfo), {
                         // 设置headers
                         headers: {
                             'Content-Type': 'application/json'
@@ -69,11 +75,12 @@
                 )
                     .then(response => {
                         console.log(response);
-                        this.users = response.data
                     })
                     .catch(function (error) {
                         console.log(error);
                     });
+
+                alert("重置成功！！")
             }
         }
     })
