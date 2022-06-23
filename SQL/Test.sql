@@ -167,6 +167,26 @@ UPDATE users SET u_password = '%s' WHERE u_email = '%s';
 
 
 
+SELECT * FROM email_password_resets WHERE epr_email = '%s' AND epr_code = '%s';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

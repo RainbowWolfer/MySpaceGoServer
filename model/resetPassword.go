@@ -5,8 +5,13 @@ import (
 	"rainbowwolfer/myspacegoserver/api"
 )
 
+type SendResetPasswordEmail struct {
+	Email string `json:"email"`
+}
+
 type ResetPassword struct {
 	Email       string `json:"email"`
+	Code        string `json:"code"`
 	NewPassword string `json:"new_password"`
 }
 
