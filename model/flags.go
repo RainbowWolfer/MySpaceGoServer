@@ -6,10 +6,10 @@ import (
 )
 
 type FlagMessage struct {
-	Email           string
-	Password        string
-	SenderID        string
-	FlagHasReceived bool
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	SenderID        string `json:"sender_id"`
+	FlagHasReceived bool   `json:"flag_has_received"`
 }
 
 func (new FlagMessage) CheckValid() error {

@@ -154,3 +154,21 @@ CALL GetPostsByTime(1,0,5);
 
 
 
+
+
+
+INSERT INTO messages (m_sender, m_receiver, m_text_content) VALUES ();
+
+
+
+SELECT * FROM users;
+
+UPDATE users SET u_password = '%s' WHERE u_email = '%s';
+
+
+
+
+
+
+
+

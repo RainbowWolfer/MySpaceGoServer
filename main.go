@@ -28,14 +28,22 @@ const (
 	MAX_IMAGES_POST = 9
 	PORT            = 4500
 	HOST            = "http://www.cqtest.top"
+
+	SERVER_EMAIL   = "1519787190@qq.com"
+	EMAIL_PASSWORD = "awowxbgooevfgbjc"
+
+	SMTP_HOST = "smtp.qq.com"
+	SMTP_PORT = "587"
+
+	SERVER_COMMAND_CODE = ""
 )
 
-func getIndexHandler(w http.ResponseWriter, r *http.Request) {
+func getIndexHandler_html(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "get") {
 		return
 	}
 	w.Header().Add("Content-Type", "text/html")
-	http.ServeFile(w, r, "index.html")
+	http.ServeFile(w, r, "html/index.html")
 }
 
 //Login - Get
@@ -412,7 +420,7 @@ func sendValidationEmail_post(w http.ResponseWriter, r *http.Request) {
 
 	to := []string{email_query}
 
-	t, _ := template.ParseFiles("email_validation.html")
+	t, _ := template.ParseFiles("html/email_validation.html")
 	var body bytes.Buffer
 
 	mimeHeaders := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
@@ -428,26 +436,9 @@ func sendValidationEmail_post(w http.ResponseWriter, r *http.Request) {
 		Link: url,
 	})
 
-	from := "1519787190@qq.com"
-	password := "awowxbgooevfgbjc"
+	auth := LoginAuth(SERVER_EMAIL, EMAIL_PASSWORD)
 
-	smtpHost := "smtp.qq.com"
-	smtpPort := "587"
-
-	// m := gomail.NewMessage()
-	// m.SetHeader(`From`, from)
-	// m.SetHeader(`From`, email_query)
-	// m.SetHeader(`Subject`, body.String())
-	// d := gomail.NewDialer(smtpHost, 587, from, password)
-	// d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
-	// if err := d.DialAndSend(m); err != nil {
-	// 	api.HttpError(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
-
-	auth := LoginAuth(from, password)
-
-	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, body.Bytes())
+	err = smtp.SendMail(SMTP_HOST+":"+SMTP_PORT, auth, SERVER_EMAIL, to, body.Bytes())
 	if err != nil {
 		api.HttpError(w, "sending email failed : "+err.Error(), http.StatusInternalServerError)
 		return
@@ -527,7 +518,7 @@ func validateEmail_get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Content-Type", "text/html")
-	http.ServeFile(w, r, "email_validation_success.html")
+	http.ServeFile(w, r, "html/email_validation_success.html")
 }
 
 func checkUserExist_get(w http.ResponseWriter, r *http.Request) {
@@ -2167,7 +2158,8 @@ func flagReceived_post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sql := fmt.Sprintf("CALL FlagHasReceived(%d,%s);", user_id, obj.SenderID)
-	_, err = database.Exec(sql)
+	println(sql)
+	_, err = database.Query(sql)
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2183,19 +2175,124 @@ func flagUnread_post(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func resetPassword_post(w http.ResponseWriter, r *http.Request){
+//change password in database
+func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
 	}
-	
-	
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj model.ResetPassword
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("update users set u_password = '%s' where u_email = '%s';", obj.Email, obj.NewPassword)
+	_, err = database.Exec(sql)
+
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "success")
+}
+
+//send email
+func sendResetPasswordEmail_post(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+}
+
+func getPostsBySearch_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "email", "password", "search", "offset", "limit") {
+		return
+	}
+
+	email := query["email"][0]
+	password := query["password"][0]
+	search := query["search"][0]
+	offset := query["offset"][0]
+	limit := query["limit"][0]
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	user_id, err := model.GetUserID(database, email, password)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sql := fmt.Sprintf("CALL GetPostsBySearch(%d,'%s','%s','%s');", user_id, search, offset, limit)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var list []model.Post
+	for rows.Next() {
+		item, err := model.ReadPost(rows)
+		if err != nil {
+			api.HttpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		list = append(list, item)
+	}
+
+	fmt.Fprint(w, api.ToJson(list))
+}
+
+func getVersion_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	fmt.Fprint(w, api.ToJson(struct {
+		Version string
+	}{
+		Version: "1.0.0.0",
+	}))
+}
+
+func getResetPassword_html(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	w.Header().Add("Content-Type", "text/html")
+	http.ServeFile(w, r, "html/reset_password.html")
 }
 
 func main() {
 	println(api.Now())
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", getIndexHandler) //get
+	mux.HandleFunc("/", getIndexHandler_html) //get
 
 	mux.HandleFunc("/user", getUser_get)                                          //get
 	mux.HandleFunc("/user/checkExisting", checkUserExist_get)                     //get
@@ -2204,7 +2301,10 @@ func main() {
 	mux.HandleFunc("/user/follow", userFollow_post)                               //post
 	mux.HandleFunc("/user/getFollowers", getUserFollowers_get)                    //get
 	mux.HandleFunc("/user/postsAndFollowersCount", getPostsAndFollowersCount_get) //get
-	mux.HandleFunc("/user/resetPassword", resetPassword_post) //get
+
+	mux.HandleFunc("/user/resetPassword", resetPassword_post)                   //post
+	mux.HandleFunc("/user/sendResetPasswordEmail", sendResetPasswordEmail_post) //post
+	mux.HandleFunc("/page/resetPassword", getResetPassword_html)                //get
 
 	mux.HandleFunc("/login", tryLogin_get)              //get
 	mux.HandleFunc("/upload/avatar", uploadAvatar_post) //post
@@ -2224,6 +2324,7 @@ func main() {
 	mux.HandleFunc("/post/repost", repost_post)                 //post
 	mux.HandleFunc("/post/repostRecords", getRepostRecords_get) //get
 	mux.HandleFunc("/post/scoreRecords", getScoreRecords_get)   //get
+	mux.HandleFunc("/post/search", getPostsBySearch_get)        //get
 
 	mux.HandleFunc("/collections/add", addToCollection_post)     //post
 	mux.HandleFunc("/collections/remove", removeCollection_post) //post
@@ -2233,6 +2334,8 @@ func main() {
 	mux.HandleFunc("/message/get", getMessages_get)             //get
 	mux.HandleFunc("/message/flagReceived", flagReceived_post)  //post
 	mux.HandleFunc("/message/flagUnread", flagUnread_post)      //post
+
+	mux.HandleFunc("/myspace/version", getVersion_get) //get
 
 	mux.HandleFunc("/admin/clearunusedpostimages", handlers.ClearUnusedPostImages)
 	mux.HandleFunc("/admin/reinflatedefaultposts", handlers.ReinflateDefaultPosts)

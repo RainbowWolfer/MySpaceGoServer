@@ -186,6 +186,37 @@ DELIMITER ;
 CALL GetPostsByTargetID(1,2,10,10);
 
 
+DROP PROCEDURE IF EXISTS GetPostsBySearch;
+DELIMITER @@
+CREATE PROCEDURE GetPostsBySearch(IN user_id INT, IN search_content VARCHAR(100), IN _offset INT, IN _length INT)
+BEGIN
+	SELECT v.*,
+		p_upvotes - p_downvotes AS p_score,
+		HasVoted(user_id, v.p_id) AS p_voted,
+		(SELECT COUNT(c.p_id) FROM posts_view c WHERE c.origin_user_id = user_id AND c.p_id = v.p_id) >= 1 OR 
+		(SELECT COUNT(c.p_id_origin_post) FROM posts_view c WHERE c.origin_user_id = 1 AND c.p_id_origin_post = v.p_id) >= 1 AS p_has_reposted,
+		IF(v.p_is_repost = TRUE, v.origin_upvotes - v.origin_downvotes, NULL) AS origin_score,
+		IF(v.p_is_repost = TRUE, HasVoted(user_id,v.p_id_origin_post), NULL) AS origin_voted
+	FROM posts_view v
+	WHERE p_visibility = "all" AND INSTR(p_text_content, search_content) > 0
+	UNION
+	SELECT v.*,
+		p_upvotes - p_downvotes AS p_score,
+		HasVoted(user_id, v.p_id) AS p_voted,
+		(SELECT COUNT(c.p_id) FROM posts_view c WHERE c.origin_user_id = user_id AND c.p_id = v.p_id) >= 1 OR 
+		(SELECT COUNT(c.p_id_origin_post) FROM posts_view c WHERE c.origin_user_id = 1 AND c.p_id_origin_post = v.p_id) >= 1 AS p_has_reposted,
+		IF(v.p_is_repost = TRUE, v.origin_upvotes - v.origin_downvotes, NULL) AS origin_score,
+		IF(v.p_is_repost = TRUE, HasVoted(user_id,v.p_id_origin_post), NULL) AS origin_voted
+	FROM posts_view v, users_follows
+	WHERE p_visibility = "follower" AND p_publisher_id = uf_id_target AND uf_id_follower = user_id AND INSTR(p_text_content, search_content) > 0
+	ORDER BY p_publish_date DESC
+	LIMIT _offset, _length;
+END@@
+DELIMITER ;
+
+CALL GetPostsBySearch(1,'Lorem',0,10);
+CALL GetPostsBySearch(23,'uuyg',0,5);
+
 DROP PROCEDURE IF EXISTS GetPostByID;
 DELIMITER @@
 CREATE PROCEDURE GetPostByID(IN post_id INT, IN _email VARCHAR(40), IN _password VARCHAR(40))
@@ -519,7 +550,7 @@ DELIMITER ;
 
 CALL GetMessageContacts(2);
 
-
+CALL FlagHasReceived(2,5);
 
 
 
