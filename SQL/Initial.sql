@@ -21,6 +21,14 @@ CREATE TABLE email_validations(
 	ev_datetime DATETIME NOT NULL
 );
 
+DROP TABLE IF EXISTS email_password_resets;
+CREATE TABLE email_password_resets(
+	epr_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	epr_email VARCHAR(40) NOT NULL UNIQUE,
+	epr_code VARCHAR(200) NOT NULL,
+	epr_datetime DATETIME NOT NULL DEFAULT(NOW())
+);
+
 DROP TABLE IF EXISTS posts;
 CREATE TABLE posts(
 	p_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL, #Both

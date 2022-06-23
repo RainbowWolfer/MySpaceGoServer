@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -2199,7 +2200,22 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 	}
 	defer database.Close()
 
-	sql := fmt.Sprintf("update users set u_password = '%s' where u_email = '%s';", obj.Email, obj.NewPassword)
+	//validate
+	sql := fmt.Sprintf("select * from email_password_resets where epr_email = '%s' and epr_code = '%s';", obj.Email, obj.Code)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		api.HttpError(w, "Validate Email & Code Error", http.StatusBadRequest)
+		return
+	}
+
+	sql = fmt.Sprintf("update users set u_password = '%s' where u_email = '%s';", obj.Email, obj.NewPassword)
 	_, err = database.Exec(sql)
 
 	if err != nil {
@@ -2215,7 +2231,89 @@ func sendResetPasswordEmail_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
 	}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
 
+	var obj model.SendResetPasswordEmail
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	to := []string{obj.Email}
+
+	t, _ := template.ParseFiles("html/reset_password_email.html")
+	var buffer bytes.Buffer
+
+	mimeHeaders := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+	buffer.Write([]byte(fmt.Sprintf("Subject: My Space Reset Password \n%s\n\n", mimeHeaders)))
+
+	code := api.GetMD5Hash(fmt.Sprintf("%s_%s", obj.Email, time.StampMilli))
+	//store code into database for later validate use
+
+	t.Execute(&buffer, struct {
+		Email string
+		Code  string
+	}{
+		Email: obj.Email,
+		Code:  code,
+	})
+
+	auth := LoginAuth(SERVER_EMAIL, EMAIL_PASSWORD)
+
+	err = smtp.SendMail(SMTP_HOST+":"+SMTP_PORT, auth, SERVER_EMAIL, to, buffer.Bytes())
+	if err != nil {
+		api.HttpError(w, "sending email failed : "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("insert into email_password_resets (epr_email, epr_code) values ('%s','%s');", obj.Email, code)
+	_, err = database.Exec(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	fmt.Fprintln(w, "success")
+}
+
+func checkResetExists_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "email") {
+		return
+	}
+	email := query["email"][0]
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	sql := fmt.Sprintf("select * from email_password_resets where epr_email = '%s';", email)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	fmt.Fprint(w, rows.Next())
 }
 
 func getPostsBySearch_get(w http.ResponseWriter, r *http.Request) {
@@ -2304,6 +2402,7 @@ func main() {
 
 	mux.HandleFunc("/user/resetPassword", resetPassword_post)                   //post
 	mux.HandleFunc("/user/sendResetPasswordEmail", sendResetPasswordEmail_post) //post
+	mux.HandleFunc("/user/checkResetExists", checkResetExists_get)              //get
 	mux.HandleFunc("/page/resetPassword", getResetPassword_html)                //get
 
 	mux.HandleFunc("/login", tryLogin_get)              //get
