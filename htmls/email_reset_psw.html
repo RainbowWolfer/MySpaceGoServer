@@ -92,7 +92,7 @@
         </div>
         <div class="form-wrapper">
             <div id="resetPsw">
-                <form @submit="demo">
+                <form @submit="submit">
                     <div class="form-group">
 
                         <input type="email" v-model.trim="userInfo.email"
@@ -135,9 +135,6 @@
         },
         methods: {
             submit() {
-                console.log(JSON.stringify(this.userInfo))
-            },
-            demo() {
                 /*
                 * 整理成 json 格式
                 * */
