@@ -48,3 +48,16 @@ func GetUserID(db *sql.DB, email string, pasword string) (int, error) {
 	}
 	return userID, nil
 }
+
+func CheckEmailExists(db *sql.DB, email string) (bool, error) {
+	sql := fmt.Sprintf("select u_id from users where u_email = '%s';", email)
+	rows, err := db.Query(sql)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return false, nil
+	}
+	return true, nil
+}

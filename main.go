@@ -2243,6 +2243,23 @@ func sendResetPasswordEmail_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	exists, err := model.CheckEmailExists(database, obj.Email)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !exists {
+		api.HttpError(w, "No User Found", http.StatusBadRequest)
+		return
+	}
+
 	to := []string{obj.Email}
 
 	t, _ := template.ParseFiles("html/reset_password_email.html")
@@ -2269,13 +2286,6 @@ func sendResetPasswordEmail_post(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, "sending email failed : "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	database, err := api.GetDatabase()
-	if err != nil {
-		api.HttpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer database.Close()
 
 	sql := fmt.Sprintf("insert into email_password_resets (epr_email, epr_code) values ('%s','%s');", obj.Email, code)
 	_, err = database.Exec(sql)
