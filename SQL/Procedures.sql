@@ -540,17 +540,17 @@ BEGIN
 		) AS m_datetime,
 		(SELECT COUNT(m_has_received) 
 			FROM messages 
-			WHERE m_sender = 1 AND m_has_received = 0
-		) AS m_has_received
+			WHERE m_receiver = 1 AND m_has_received = 0
+		) AS m_unread_count
 	FROM messages_view b
 	WHERE m_receiver = user_id AND m_datetime > DATE(NOW() - INTERVAL 7 DAY)
 	GROUP BY m_sender;
 END @@
 DELIMITER ;
 
-CALL GetMessageContacts(2);
+CALL GetMessageContacts(1);
 
-CALL FlagHasReceived(2,5);
+CALL FlagHasReceived(1,2);
 
 
 
