@@ -11,3 +11,7 @@ type DeletePost struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
+
+type DeletePostWithOnlyID struct {
+	PostID   string `json:"post_id"`
+}

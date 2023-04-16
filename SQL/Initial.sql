@@ -21,7 +21,7 @@ CREATE TABLE managers(
 DROP TABLE IF EXISTS banned_users;
 CREATE TABLE banned_users(
 	bu_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
-	bu_id_user INT NOT NULL,
+	bu_id_user INT UNIQUE NOT NULL,
 	CONSTRAINT fk_bu_id_uesr FOREIGN KEY (bu_id_user) REFERENCES users(u_id)
 );
 

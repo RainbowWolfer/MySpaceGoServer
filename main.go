@@ -48,19 +48,18 @@ func getIndexHandler_html(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "html/index.html")
 }
 
-func managerSearch_get(w http.ResponseWriter, r *http.Request) {
+func managerGetUser_get(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "get") {
 		return
 	}
 	query := r.URL.Query()
-	if api.CheckMissingParamters(w, query, true, "username") {
+	if api.CheckMissingParamters(w, query, true, "id") {
 		return
 	}
-	username := query["username"][0]
-	sql := fmt.Sprintf("SELECT users.*,banned_users.bu_id FROM users LEFT JOIN banned_users ON bu_id_user = u_id WHERE u_username LIKE '%%%s%%';", username)
-	
+	id := query["id"][0]
+	sql := fmt.Sprintf("SELECT users.*,banned_users.bu_id FROM users LEFT JOIN banned_users ON bu_id_user = u_id WHERE u_id = %s;", id)
 	println(sql)
-	
+
 	database, err := api.GetDatabase()
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
@@ -74,7 +73,52 @@ func managerSearch_get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
-	
+
+	if !rows.Next() {
+		api.HttpError(w, "Cannot find user", http.StatusBadRequest)
+		return
+	}
+
+	user, err := model.ReadUserWithBanned(rows)
+
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	if err := rows.Err(); err != nil {
+		api.HttpError(w, "Databse Rows Error"+err.Error(), http.StatusInternalServerError)
+	}
+
+	fmt.Fprintln(w, api.ToJson(user))
+}
+
+func managerSearch_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "username") {
+		return
+	}
+	username := query["username"][0]
+	sql := fmt.Sprintf("SELECT users.*,banned_users.bu_id FROM users LEFT JOIN banned_users ON bu_id_user = u_id WHERE u_username LIKE '%%%s%%';", username)
+
+	println(sql)
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
 	var users []model.User
 	for rows.Next() {
 		user, err := model.ReadUserWithBanned(rows)
@@ -92,7 +136,6 @@ func managerSearch_get(w http.ResponseWriter, r *http.Request) {
 	json := api.ToJson(users)
 
 	fmt.Fprintln(w, json)
-	
 }
 
 func managerLogin_get(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +168,7 @@ func managerLogin_get(w http.ResponseWriter, r *http.Request) {
 		api.HttpErrorWithCode(w, "No Manager Found", http.StatusBadRequest, 2)
 		return //no found result
 	}
-	
+
 	manager, err := model.ReadManager(rows)
 
 	if err != nil {
@@ -2062,6 +2105,77 @@ func getUserFollowers_get(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, api.ToJson(list))
 }
 
+func managerBanUser_post(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+	println(string(body))
+	
+	var obj model.BannedUserInfo
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+	
+	sql := fmt.Sprintf("CALL SetUserBanned(%s,%t);", obj.UserID,obj.IsBanned)
+	_, err = database.Exec(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "success")
+}
+
+func managerDeletePost_post(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "post") {
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
+	}
+
+	var obj model.DeletePostWithOnlyID
+	println(string(body))
+	err = json.Unmarshal(body, &obj)
+	if err != nil {
+		api.HttpError(w, "json unmarshall error:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+	
+	sql := fmt.Sprintf("CALL DeletePost(%s);", obj.PostID)
+	_, err = database.Exec(sql)
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "success")
+	
+}
+
 func deletePost_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
@@ -2602,9 +2716,11 @@ func main() {
 	mux.HandleFunc("/post/scoreRecords", getScoreRecords_get)   //get
 	mux.HandleFunc("/post/search", getPostsBySearch_get)        //get
 
-	// mux.HandleFunc("/manager/post/delete", )        //post
-	mux.HandleFunc("/manager/login", managerLogin_get) //get
-	mux.HandleFunc("/manager/search", managerSearch_get) //get
+	mux.HandleFunc("/manager/post/delete", managerDeletePost_post) //post
+	mux.HandleFunc("/manager/login", managerLogin_get)             //get
+	mux.HandleFunc("/manager/search", managerSearch_get)           //get
+	mux.HandleFunc("/manager/user", managerGetUser_get)            //get
+	mux.HandleFunc("/manager/user/ban", managerBanUser_post)            //get
 
 	mux.HandleFunc("/collections/add", addToCollection_post)     //post
 	mux.HandleFunc("/collections/remove", removeCollection_post) //post

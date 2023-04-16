@@ -553,9 +553,20 @@ CALL GetMessageContacts(1);
 CALL FlagHasReceived(1,2);
 
 
+DROP PROCEDURE IF EXISTS SetUserBanned;
+DELIMITER @@
+CREATE PROCEDURE SetUserBanned(IN user_id INT,IN banned BOOL)
+BEGIN
+	IF banned THEN
+		INSERT banned_users(bu_id_user) VALUES(user_id);
+	ELSE
+		DELETE FROM banned_users WHERE bu_id_user = user_id;
+	END IF;
+END @@
+DELIMITER ;
 
 
-
+CALL SetUserBanned(1,TRUE);
 
 
 
