@@ -7,8 +7,7 @@ import (
 )
 
 func GetDatabase() (*sql.DB, error) {
-	var err error
-	database, err := sql.Open("mysql", "wjx:123456@tcp(www.cqtest.top:3306)/wjx")
+	database, err := sql.Open("mysql", "wjx:123456@tcp(43.139.126.11:3306)/wjx")
 	// println(fmt.Sprintf("Connection in use %d", database.Stats().InUse))
 	// println("Open new Database Connection")
 	if err != nil {

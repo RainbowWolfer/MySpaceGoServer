@@ -180,15 +180,15 @@ UPDATE users SET u_password = '1519787190@qq.com' WHERE u_email = '123';
 DELETE FROM email_password_resets WHERE epr_email = '%s' AND epr_code = '%s';
 
 
+SELECT COUNT(bu_id) = 1 FROM banned_users WHERE bu_id_user = 1;
 
 
 
 
 
+SELECT * FROM managers WHERE m_username = '%s' AND m_password = '%s';
 
-
-
-
+SELECT users.*,banned_users.bu_id FROM users LEFT JOIN banned_users ON bu_id_user = u_id WHERE u_username LIKE '%my%';
 
 
 

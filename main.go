@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/mail"
@@ -30,13 +29,13 @@ const (
 	MAX_UPLOAD_SIZE = 1024 * 1024
 	MAX_IMAGES_POST = 9
 	PORT            = 4500
-	HOST            = "http://www.cqtest.top"
+	HOST            = "http://43.139.126.11"
 
-	SERVER_EMAIL   = "1519787190@qq.com"
-	EMAIL_PASSWORD = "awowxbgooevfgbjc"
+	SERVER_EMAIL   = "MySpaceOfficial@163.com"
+	EMAIL_PASSWORD = "AGUBZUOGLAKBBZPV"
 
-	SMTP_HOST = "smtp.qq.com"
-	SMTP_PORT = "587"
+	SMTP_HOST = "smtp.163.com"
+	SMTP_PORT = "25"
 
 	SERVER_COMMAND_CODE = ""
 )
@@ -49,10 +48,98 @@ func getIndexHandler_html(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "html/index.html")
 }
 
-//Login - Get
-//Error Code ->
-//1-registration pending
-//2-user not found (email or password is wrong)
+func managerSearch_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "username") {
+		return
+	}
+	username := query["username"][0]
+	sql := fmt.Sprintf("SELECT users.*,banned_users.bu_id FROM users LEFT JOIN banned_users ON bu_id_user = u_id WHERE u_username LIKE '%%%s%%';", username)
+	
+	println(sql)
+	
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	
+	var users []model.User
+	for rows.Next() {
+		user, err := model.ReadUserWithBanned(rows)
+		if err != nil {
+			println("skipping row" + err.Error())
+			continue
+		}
+		users = append(users, user)
+	}
+
+	if err = rows.Err(); err != nil {
+		api.HttpError(w, "Databse Rows Error", http.StatusInternalServerError)
+	}
+
+	json := api.ToJson(users)
+
+	fmt.Fprintln(w, json)
+	
+}
+
+func managerLogin_get(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "username", "password") {
+		return
+	}
+	username := query["username"][0]
+	password := query["password"][0]
+	sql := fmt.Sprintf("SELECT * FROM managers WHERE m_username = '%s' AND m_password = '%s';", username, password)
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		api.HttpErrorWithCode(w, "No Manager Found", http.StatusBadRequest, 2)
+		return //no found result
+	}
+	
+	manager, err := model.ReadManager(rows)
+
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintln(w, api.ToJson(manager))
+}
+
+// Login - Get
+// Error Code ->
+// 1-registration pending
+// 2-user not found (email or password is wrong)
 func tryLogin_get(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "get") {
 		return
@@ -171,6 +258,37 @@ func getUser_get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprintln(w, api.ToJson(user))
+}
+
+func checkUserBanned(w http.ResponseWriter, r *http.Request) {
+	if api.CheckRequestMethodReturn(w, r, "get") {
+		return
+	}
+
+	query := r.URL.Query()
+	if api.CheckMissingParamters(w, query, true, "id") {
+		return
+	}
+
+	database, err := api.GetDatabase()
+	if err != nil {
+		api.HttpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer database.Close()
+
+	id := query["id"][0]
+	sql := fmt.Sprintf("SELECT bu_id FROM banned_users WHERE bu_id_user = %s;", id)
+
+	rows, err := database.Query(sql)
+	if err != nil {
+		api.HttpError(w, "Query Error with :"+sql+"\n"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	foundUser := rows.Next()
+	fmt.Fprintln(w, api.ToJson(foundUser))
 }
 
 func uploadAvatar_post(w http.ResponseWriter, r *http.Request) {
@@ -338,16 +456,16 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 	return nil, nil
 }
 
-//Send Validation Email - Post
-//Error Code ->
-//1-email or username used
-//2-already sent a email
+// Send Validation Email - Post
+// Error Code ->
+// 1-email or username used
+// 2-already sent a email
 func sendValidationEmail_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
 	}
 
-	postBody, err := ioutil.ReadAll(r.Body)
+	postBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -442,6 +560,7 @@ func sendValidationEmail_post(w http.ResponseWriter, r *http.Request) {
 	auth := LoginAuth(SERVER_EMAIL, EMAIL_PASSWORD)
 
 	err = smtp.SendMail(SMTP_HOST+":"+SMTP_PORT, auth, SERVER_EMAIL, to, body.Bytes())
+	println("Sended")
 	if err != nil {
 		api.HttpError(w, "sending email failed : "+err.Error(), http.StatusInternalServerError)
 		return
@@ -562,9 +681,9 @@ func checkUserExist_get(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, foundUser)
 }
 
-//Update Username - Post
-//Error Code ->
-//1-username taken
+// Update Username - Post
+// Error Code ->
+// 1-username taken
 func updateUsername_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
@@ -572,7 +691,7 @@ func updateUsername_post(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -928,7 +1047,7 @@ func getPostImage_get(w http.ResponseWriter, r *http.Request) {
 
 func comment_post_get(w http.ResponseWriter, r *http.Request) {
 	if err := api.CheckRequestMethod(r, "post"); err == nil {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 		}
@@ -1167,7 +1286,7 @@ func votePost_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -1233,7 +1352,7 @@ func repost_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -1319,7 +1438,7 @@ func voteComment_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -1493,7 +1612,7 @@ func addToCollection_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -1636,7 +1755,7 @@ func removeCollection_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -1740,7 +1859,7 @@ func userFollow_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -1948,7 +2067,7 @@ func deletePost_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -2126,7 +2245,7 @@ func flagReceived_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -2178,7 +2297,7 @@ func flagUnread_post(w http.ResponseWriter, r *http.Request) {
 
 }
 
-//change password in database
+// change password in database
 func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
@@ -2187,7 +2306,7 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -2254,22 +2373,22 @@ func resetPassword_post(w http.ResponseWriter, r *http.Request) {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	_, err = result.RowsAffected()
 	if err != nil {
 		api.HttpError(w, err.Error(), http.StatusInternalServerError)
 		return
-	} 
+	}
 
 	fmt.Fprint(w, "success")
 }
 
-//send email
+// send email
 func sendResetPasswordEmail_post(w http.ResponseWriter, r *http.Request) {
 	if api.CheckRequestMethodReturn(w, r, "post") {
 		return
 	}
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		api.HttpError(w, "No body was found : "+err.Error(), http.StatusBadRequest)
 	}
@@ -2449,6 +2568,7 @@ func main() {
 	mux.HandleFunc("/", getIndexHandler_html) //get
 
 	mux.HandleFunc("/user", getUser_get)                                          //get
+	mux.HandleFunc("/user/checkUserBanned", checkUserBanned)                      //get
 	mux.HandleFunc("/user/checkExisting", checkUserExist_get)                     //get
 	mux.HandleFunc("/user/avatar", getAvatar_get)                                 //get
 	mux.HandleFunc("/user/update/username", updateUsername_post)                  //post
@@ -2481,6 +2601,10 @@ func main() {
 	mux.HandleFunc("/post/repostRecords", getRepostRecords_get) //get
 	mux.HandleFunc("/post/scoreRecords", getScoreRecords_get)   //get
 	mux.HandleFunc("/post/search", getPostsBySearch_get)        //get
+
+	// mux.HandleFunc("/manager/post/delete", )        //post
+	mux.HandleFunc("/manager/login", managerLogin_get) //get
+	mux.HandleFunc("/manager/search", managerSearch_get) //get
 
 	mux.HandleFunc("/collections/add", addToCollection_post)     //post
 	mux.HandleFunc("/collections/remove", removeCollection_post) //post

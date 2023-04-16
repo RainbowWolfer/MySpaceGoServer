@@ -183,7 +183,7 @@ BEGIN
 END@@
 DELIMITER ;
 
-CALL GetPostsByTargetID(1,2,10,10);
+CALL GetPostsByTargetID(-1,4,0,10);
 
 
 DROP PROCEDURE IF EXISTS GetPostsBySearch;

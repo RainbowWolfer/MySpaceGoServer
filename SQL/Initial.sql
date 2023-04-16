@@ -11,6 +11,20 @@ CREATE TABLE users(
 	u_profileDescription TEXT NOT NULL DEFAULT('This is a default description.')
 );
 
+DROP TABLE IF EXISTS managers;
+CREATE TABLE managers(
+	m_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	m_username VARCHAR(20) NOT NULL UNIQUE,
+	m_password VARCHAR(32) NOT NULL
+);
+
+DROP TABLE IF EXISTS banned_users;
+CREATE TABLE banned_users(
+	bu_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	bu_id_user INT NOT NULL,
+	CONSTRAINT fk_bu_id_uesr FOREIGN KEY (bu_id_user) REFERENCES users(u_id)
+);
+
 DROP TABLE IF EXISTS email_validations;
 CREATE TABLE email_validations(
 	ev_id INT PRIMARY KEY AUTO_INCREMENT NOT NULL,

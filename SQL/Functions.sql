@@ -1,4 +1,5 @@
 SELECT @@log_bin_trust_function_creators;
+SET GLOBAL log_bin_trust_function_creators=1;
 
 #slow behavoir in select
 DROP FUNCTION IF EXISTS HasReposted;

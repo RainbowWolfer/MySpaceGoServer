@@ -13,6 +13,7 @@ type User struct {
 	Email              string
 	ProfileDescription string
 	IsFollowing        bool
+	Banned             *int
 }
 
 func ReadUser(rows *sql.Rows) (User, error) {
@@ -24,6 +25,21 @@ func ReadUser(rows *sql.Rows) (User, error) {
 		&user.Email,
 		&user.ProfileDescription,
 		&user.IsFollowing,
+	); err != nil {
+		return User{}, errors.New("User Convert Error " + err.Error())
+	}
+	return user, nil
+}
+
+func ReadUserWithBanned(rows *sql.Rows) (User, error) {
+	var user User
+	if err := rows.Scan(
+		&user.ID,
+		&user.Username,
+		&user.Password,
+		&user.Email,
+		&user.ProfileDescription,
+		&user.Banned,
 	); err != nil {
 		return User{}, errors.New("User Convert Error " + err.Error())
 	}
